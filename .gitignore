@@ -1,0 +1,22 @@
+# dockerizer umbrella repo .gitignore
+#
+# 서브 repo (dockerizer-web / dockerizer-backend) 는 각자 독립된 git repo 다.
+# 동일 디렉토리 안에 clone 하며, 이 umbrella 의 git 추적 대상이 아니다.
+dockerizer-web/
+dockerizer-backend/
+
+# macOS / IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Claude Code per-session settings (사용자별, 공유 X)
+.claude/settings.local.json
+
+# 기타
+*.log
+.env
+.env.local
+.env.*.local
