@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dockerizer Build Flow</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e1e4eb;
+    --muted: #8b8fa3;
+    --accent: #3b82f6;
+    --green: #22c55e;
+    --orange: #f59e0b;
+    --red: #ef4444;
+    --purple: #a855f7;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 40px 20px;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 40px; }
+
+  /* Section */
+  .section {
+    margin-bottom: 48px;
+  }
+  .section-title {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-title .num {
+    background: var(--accent);
+    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+  .card-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .badge-frontend { background: #1e3a5f; color: #60a5fa; }
+  .badge-backend { background: #1a3a1a; color: #4ade80; }
+  .badge-controller { background: #3b1f4a; color: #c084fc; }
+  .badge-k8s { background: #3f2b10; color: #fbbf24; }
+
+  /* Flow diagram */
+  .flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin: 20px 0;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  .flow-step {
+    flex: 1;
+    min-width: 160px;
+    text-align: center;
+    position: relative;
+  }
+  .flow-step::after {
+    content: '→';
+    position: absolute;
+    right: -12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 20px;
+    color: var(--muted);
+    z-index: 1;
+  }
+  .flow-step:last-child::after { content: ''; }
+  .flow-box {
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 12px;
+    margin: 0 14px;
+    background: var(--card);
+    transition: border-color .2s;
+  }
+  .flow-box:hover { border-color: var(--accent); }
+  .flow-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .flow-value { font-size: 13px; font-weight: 500; }
+
+  /* Phase diagram */
+  .phases {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 16px 0;
+    flex-wrap: wrap;
+  }
+  .phase {
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 2px solid transparent;
+  }
+  .phase-pending { background: #1e293b; color: var(--muted); border-color: #334155; }
+  .phase-preparing { background: #1a1a3e; color: #818cf8; border-color: #3730a3; }
+  .phase-building { background: #1a2e1a; color: var(--orange); border-color: #854d0e; }
+  .phase-succeeded { background: #0f2a1a; color: var(--green); border-color: #166534; }
+  .phase-failed { background: #2a0f0f; color: var(--red); border-color: #991b1b; }
+  .phase-arrow { color: var(--muted); font-size: 18px; }
+
+  /* Code block */
+  .code-block {
+    background: #12141c;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 12.5px;
+    line-height: 1.7;
+    overflow-x: auto;
+    white-space: pre;
+    margin: 12px 0;
+  }
+  .code-block .comment { color: #6b7280; }
+  .code-block .key { color: #60a5fa; }
+  .code-block .val { color: #4ade80; }
+  .code-block .str { color: #fbbf24; }
+  .code-block .kw { color: #c084fc; }
+
+  /* Table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 2px solid var(--border);
+    color: var(--muted);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:last-child td { border-bottom: none; }
+  code {
+    background: #1e2030;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    color: #e0a4ff;
+  }
+
+  /* Desc list */
+  .desc-list { margin: 8px 0; }
+  .desc-item {
+    display: flex;
+    gap: 12px;
+    padding: 6px 0;
+    font-size: 13px;
+  }
+  .desc-item .label {
+    color: var(--muted);
+    min-width: 120px;
+    flex-shrink: 0;
+    font-weight: 500;
+  }
+
+  /* Diagram: Pod spec */
+  .pod-diagram {
+    display: flex;
+    gap: 16px;
+    margin: 16px 0;
+    flex-wrap: wrap;
+  }
+  .pod-box {
+    flex: 1;
+    min-width: 260px;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .pod-box-header {
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .pod-box-body {
+    padding: 14px 16px;
+    font-size: 12.5px;
+  }
+  .pod-box-body .mount {
+    display: flex;
+    gap: 8px;
+    padding: 4px 0;
+    align-items: baseline;
+  }
+  .mount-icon { color: var(--muted); flex-shrink: 0; }
+  .mount-path { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+  .volume-header { background: #1e293b; color: #94a3b8; }
+  .container-header { background: #1a2e1a; color: var(--green); }
+
+  /* SSE diagram */
+  .sse-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin: 16px 0;
+    flex-wrap: wrap;
+  }
+  .sse-node {
+    background: var(--card);
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 20px;
+    text-align: center;
+    min-width: 140px;
+  }
+  .sse-arrow {
+    color: var(--muted);
+    padding: 0 8px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .sse-node-label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; }
+  .sse-node-value { font-size: 13px; font-weight: 500; margin-top: 2px; }
+
+  .highlight { color: var(--accent); font-weight: 600; }
+  .note {
+    font-size: 12.5px;
+    color: var(--muted);
+    padding: 10px 14px;
+    border-left: 3px solid var(--border);
+    margin: 12px 0;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Dockerizer — 이미지 빌드 흐름</h1>
+<p class="subtitle">프론트엔드 "빌드 실행" 버튼부터 Harbor push, 실시간 로그 스트리밍까지의 전체 과정</p>
+
+<!-- ─── Section 1: Overview Flow ─── -->
+<div class="section">
+  <div class="section-title"><span class="num">1</span> 전체 흐름 요약</div>
+
+  <div class="flow">
+    <div class="flow-step">
+      <div class="flow-box">
+        <div class="flow-label">Frontend</div>
+        <div class="flow-value">"빌드 실행" 클릭<br><code>POST /builds</code></div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-box">
+        <div class="flow-label">Backend Server</div>
+        <div class="flow-value">Dockerfile 조회<br>ImageBuild CR 생성</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-box">
+        <div class="flow-label">Controller</div>
+        <div class="flow-value">CR Watch<br>ConfigMap + Job 생성</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-box">
+        <div class="flow-label">Kaniko Pod</div>
+        <div class="flow-value">Dockerfile 빌드<br>Harbor Push</div>
+      </div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-box">
+        <div class="flow-label">Frontend</div>
+        <div class="flow-value">SSE 로그 스트리밍<br>결과 표시</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Phase 상태 전이</div>
+    <div class="phases">
+      <span class="phase phase-pending">Pending</span>
+      <span class="phase-arrow">→</span>
+      <span class="phase phase-preparing">Preparing</span>
+      <span class="phase-arrow">→</span>
+      <span class="phase phase-building">Building</span>
+      <span class="phase-arrow">→</span>
+      <span class="phase phase-succeeded">Succeeded</span>
+    </div>
+    <div class="phases" style="margin-top:4px; padding-left: 270px;">
+      <span class="phase-arrow" style="visibility:hidden">→</span>
+      <span class="phase-arrow" style="visibility:hidden">→</span>
+      <span class="phase-arrow">↘</span>
+      <span class="phase phase-failed">Failed</span>
+    </div>
+    <div class="note">
+      <strong>Pending:</strong> CR 생성 직후 초기 상태<br>
+      <strong>Preparing:</strong> Controller가 Dockerfile ConfigMap 생성<br>
+      <strong>Building:</strong> Kaniko Job이 생성되어 빌드 진행 중<br>
+      <strong>Succeeded / Failed:</strong> Job 완료 후 최종 상태 (imageDigest 또는 에러 메시지 기록)
+    </div>
+  </div>
+</div>
+
+<!-- ─── Section 2: Frontend Trigger ─── -->
+<div class="section">
+  <div class="section-title"><span class="num">2</span> 프론트엔드 → 백엔드 요청</div>
+
+  <div class="card">
+    <div class="card-title">
+      <span class="badge badge-frontend">Frontend</span>
+      POST /api/v1alpha1/builds
+    </div>
+    <div class="code-block"><span class="comment">// ImageBuildRequest — 프론트에서 전송하는 빌드 요청 바디</span>
+{
+  <span class="key">"dockerfileId"</span>:        <span class="val">42</span>,                          <span class="comment">// 저장된 Dockerfile ID</span>
+  <span class="key">"targetImage"</span>:          <span class="str">"aipub-harbor.../pjw/my-img"</span>,  <span class="comment">// 레지스트리/프로젝트/이미지명</span>
+  <span class="key">"tag"</span>:                  <span class="str">"v1.0"</span>,                        <span class="comment">// 이미지 태그</span>
+  <span class="key">"buildContextPvc"</span>:      <span class="str">"data-storage-43d77785"</span>,       <span class="comment">// (선택) AIPubVolume의 PVC 이름</span>
+  <span class="key">"buildContextSubPath"</span>:  <span class="str">"/workspace/src"</span>               <span class="comment">// (선택) PVC 내 하위 경로</span>
+}</div>
+    <p class="note">응답 코드: <code>202 Accepted</code> — CR 생성 성공 시 즉시 반환. 빌드 자체는 비동기 실행.</p>
+  </div>
+</div>
+
+<!-- ─── Section 3: Backend Server ─── -->
+<div class="section">
+  <div class="section-title"><span class="num">3</span> Backend Server — ImageBuild CR 생성</div>
+
+  <div class="card">
+    <div class="card-title">
+      <span class="badge badge-backend">Backend</span>
+      ImageBuildService.triggerBuild()
+    </div>
+    <table>
+      <tr><th style="width:30%">단계</th><th>동작</th></tr>
+      <tr>
+        <td>1. Dockerfile 조회</td>
+        <td><code>dockerfileId</code>로 DB에서 Dockerfile 엔티티 조회 (content, baseImage 등)</td>
+      </tr>
+      <tr>
+        <td>2. 검증</td>
+        <td><code>DockerfileValidator</code>로 금지 지시자(ADD) 포함 여부 확인 → 있으면 reject</td>
+      </tr>
+      <tr>
+        <td>3. CR 이름 생성</td>
+        <td><code>imgbuild-{username}-{timestamp}</code> 형태로 고유 이름 생성</td>
+      </tr>
+      <tr>
+        <td>4. ImageBuild CR 생성</td>
+        <td>K8s CustomObjectsApi로 해당 namespace에 CR 생성 (아래 스펙 참조)</td>
+      </tr>
+    </table>
+
+    <div class="code-block"><span class="comment">// 생성되는 ImageBuild CR 구조</span>
+<span class="kw">apiVersion</span>: <span class="str">dockerizer.aipub.ten1010.io/v1alpha1</span>
+<span class="kw">kind</span>: <span class="str">ImageBuild</span>
+<span class="kw">metadata</span>:
+  <span class="key">name</span>: <span class="str">imgbuild-joonwoo-20260602120000</span>
+  <span class="key">namespace</span>: <span class="str">pjw</span>                       <span class="comment"># Project namespace</span>
+  <span class="key">labels</span>:
+    <span class="key">dockerizer.aipub.ten1010.io/dockerfile-id</span>: <span class="str">"42"</span>
+    <span class="key">dockerizer.aipub.ten1010.io/username</span>: <span class="str">"joonwoo"</span>
+<span class="kw">spec</span>:
+  <span class="key">dockerfileContent</span>: |                    <span class="comment"># Dockerfile 전체 내용 (인라인)</span>
+    FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
+    RUN pip install transformers
+  <span class="key">targetImage</span>: <span class="str">aipub-harbor.../pjw/my-img:v1.0</span>
+  <span class="key">pushSecretRef</span>: <span class="str">image-registry-secret-project-aipub-ten1010-io-pjw</span>
+  <span class="key">buildContextPvc</span>: <span class="str">data-storage-43d77785</span>   <span class="comment"># (있을 때만)</span>
+  <span class="key">buildContextSubPath</span>: <span class="str">/workspace/src</span>       <span class="comment"># (있을 때만)</span></div>
+  </div>
+</div>
+
+<!-- ─── Section 4: Controller ─── -->
+<div class="section">
+  <div class="section-title"><span class="num">4</span> ImageBuild Controller — Kaniko Job 생성</div>
+
+  <div class="card">
+    <div class="card-title">
+      <span class="badge badge-controller">Controller</span>
+      ImageBuildReconciler — 상태 머신
+    </div>
+    <table>
+      <tr><th style="width:25%">전이</th><th style="width:35%">동작</th><th>생성되는 리소스</th></tr>
+      <tr>
+        <td class="highlight">Pending → Preparing</td>
+        <td>Dockerfile ConfigMap 생성</td>
+        <td>
+          <code>ConfigMap/{cr-name}-dockerfile</code><br>
+          Key: <code>Dockerfile</code> / Value: Dockerfile 내용
+        </td>
+      </tr>
+      <tr>
+        <td class="highlight">Preparing → Building</td>
+        <td>Kaniko Job 생성 + startTime 기록</td>
+        <td>
+          <code>Job/{cr-name}-job</code><br>
+          아래 Pod 스펙 상세 참조
+        </td>
+      </tr>
+      <tr>
+        <td class="highlight">Building → Succeeded</td>
+        <td>Job 성공 감지 → imageDigest 기록</td>
+        <td>CR status 업데이트 + completionTime</td>
+      </tr>
+      <tr>
+        <td class="highlight">Building → Failed</td>
+        <td>Job 실패 감지 → 에러 메시지 기록</td>
+        <td>CR status 업데이트 + completionTime</td>
+      </tr>
+    </table>
+    <p class="note">
+      Controller는 두 개의 Watcher를 운영한다:<br>
+      • <strong>ImageBuildWatcher</strong> — ImageBuild CR의 ADDED/MODIFIED 이벤트 감지<br>
+      • <strong>JobWatcher</strong> — <code>managed-by=dockerizer-controller</code> 레이블이 있는 Job 이벤트 감지 → 연관된 CR로 reconcile 트리거
+    </p>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <span class="badge badge-k8s">K8s</span>
+      Kaniko Job — Pod 스펙 상세
+    </div>
+
+    <div class="desc-list">
+      <div class="desc-item"><span class="label">Job 이름</span> <code>{cr-name}-job</code></div>
+      <div class="desc-item"><span class="label">backoffLimit</span> <code>0</code> (재시도 없음)</div>
+      <div class="desc-item"><span class="label">ttlAfterFinished</span> <code>3600초</code> (완료 후 1시간 유지)</div>
+      <div class="desc-item"><span class="label">restartPolicy</span> <code>Never</code></div>
+      <div class="desc-item"><span class="label">Owner Reference</span> ImageBuild CR (CR 삭제 시 Job도 GC)</div>
+    </div>
+
+    <div class="pod-diagram">
+      <!-- Container -->
+      <div class="pod-box" style="flex: 2;">
+        <div class="pod-box-header container-header">🐳 Container: kaniko</div>
+        <div class="pod-box-body">
+          <div class="desc-list">
+            <div class="desc-item"><span class="label">Image</span> <code>kaniko-executor:v1.24.0</code></div>
+            <div class="desc-item"><span class="label">Args</span></div>
+          </div>
+          <div class="code-block" style="margin: 4px 0; font-size: 12px;"><span class="comment"># Build Context가 없는 경우 (ConfigMap이 context)</span>
+<span class="str">--dockerfile=/workspace/Dockerfile</span>
+<span class="str">--context=dir:///workspace</span>
+<span class="str">--destination=aipub-harbor.../pjw/my-img:v1.0</span>
+<span class="str">--cache=false</span>
+<span class="str">--insecure</span>
+<span class="str">--skip-tls-verify</span>
+
+<span class="comment"># Build Context PVC가 있는 경우</span>
+<span class="str">--dockerfile=/kaniko-config/Dockerfile</span>
+<span class="str">--context=dir:///workspace</span>
+<span class="str">--destination=aipub-harbor.../pjw/my-img:v1.0</span>
+<span class="str">--cache=false</span>
+<span class="str">--insecure</span>
+<span class="str">--skip-tls-verify</span></div>
+          <div style="margin-top: 12px; font-weight: 600; font-size: 13px; color: var(--muted);">Volume Mounts:</div>
+          <div class="mount"><span class="mount-icon">📄</span> <span class="mount-path">/workspace</span> ← dockerfile (ConfigMap) <em style="color:var(--muted);font-size:11px;">context 없을 때</em></div>
+          <div class="mount"><span class="mount-icon">📄</span> <span class="mount-path">/kaniko-config</span> ← dockerfile (ConfigMap) <em style="color:var(--muted);font-size:11px;">context 있을 때</em></div>
+          <div class="mount"><span class="mount-icon">💾</span> <span class="mount-path">/workspace</span> ← build-context (PVC, ReadOnly) <em style="color:var(--muted);font-size:11px;">context 있을 때</em></div>
+          <div class="mount"><span class="mount-icon">🔑</span> <span class="mount-path">/kaniko/.docker</span> ← docker-config (Secret)</div>
+        </div>
+      </div>
+
+      <!-- Volumes -->
+      <div class="pod-box" style="flex: 1;">
+        <div class="pod-box-header volume-header">📦 Volumes</div>
+        <div class="pod-box-body">
+          <div style="margin-bottom: 14px;">
+            <div style="font-weight:600; font-size:13px;">dockerfile</div>
+            <div style="font-size:12px; color:var(--muted);">
+              Type: <code>ConfigMap</code><br>
+              Name: <code>{cr-name}-dockerfile</code><br>
+              Key: <code>Dockerfile</code>
+            </div>
+          </div>
+          <div style="margin-bottom: 14px;">
+            <div style="font-weight:600; font-size:13px;">docker-config</div>
+            <div style="font-size:12px; color:var(--muted);">
+              Type: <code>Secret</code><br>
+              Name: <code>image-registry-secret-project-aipub-ten1010-io-{ns}</code><br>
+              Key: <code>.dockerconfigjson</code> → <code>config.json</code>
+            </div>
+          </div>
+          <div>
+            <div style="font-weight:600; font-size:13px;">build-context <span style="font-size:11px;color:var(--muted)">(선택)</span></div>
+            <div style="font-size:12px; color:var(--muted);">
+              Type: <code>PVC</code> (ReadOnly)<br>
+              Name: AIPubVolume의 PVC 이름<br>
+              SubPath: 지정 시 적용
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <p class="note">
+      <strong>Build Context 유무에 따른 차이:</strong><br>
+      • <strong>Context 없음</strong> — ConfigMap이 <code>/workspace</code>에 마운트되어 Dockerfile 자체가 context<br>
+      • <strong>Context 있음 (PVC)</strong> — PVC가 <code>/workspace</code>에 마운트되고, ConfigMap은 <code>/kaniko-config</code>에 별도 마운트. <code>COPY</code> 명령으로 PVC 내 파일을 이미지에 포함 가능
+    </p>
+  </div>
+</div>
+
+<!-- ─── Section 5: Build Log Streaming ─── -->
+<div class="section">
+  <div class="section-title"><span class="num">5</span> 빌드 로그 실시간 스트리밍 (SSE)</div>
+
+  <div class="card">
+    <div class="card-title">
+      전체 흐름
+    </div>
+    <div class="sse-flow">
+      <div class="sse-node">
+        <div class="sse-node-label">Kaniko Pod</div>
+        <div class="sse-node-value">stdout/stderr</div>
+      </div>
+      <div class="sse-arrow">Pod log API<br>→ follow=true →</div>
+      <div class="sse-node">
+        <div class="sse-node-label">Backend Server</div>
+        <div class="sse-node-value">SSE Emitter</div>
+      </div>
+      <div class="sse-arrow">text/event-stream<br>→ line by line →</div>
+      <div class="sse-node">
+        <div class="sse-node-label">Browser</div>
+        <div class="sse-node-value">EventSource API</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="badge badge-backend">Backend</span> SSE 엔드포인트</div>
+    <table>
+      <tr><th style="width:25%">항목</th><th>내용</th></tr>
+      <tr><td>엔드포인트</td><td><code>GET /api/v1alpha1/builds/{ns}/{name}/logs/stream</code></td></tr>
+      <tr><td>Content-Type</td><td><code>text/event-stream</code></td></tr>
+      <tr><td>Timeout</td><td>5분 (300,000ms)</td></tr>
+      <tr><td>Pod 탐색</td><td>Job 이름 <code>{cr-name}-job</code>에 대응하는 Pod를 label selector로 탐색</td></tr>
+    </table>
+    <div class="code-block"><span class="comment">// Backend 동작 (ImageBuildService.streamBuildLogs)</span>
+
+<span class="kw">1.</span> SseEmitter 생성 (timeout: 5분)
+<span class="kw">2.</span> 백그라운드 스레드에서:
+   └─ PodLogs API로 Pod 로그 스트림 열기 (<span class="val">follow=true</span>)
+   └─ BufferedReader로 한 줄씩 읽기
+   └─ 각 줄을 <span class="str">emitter.send(SseEmitter.event().data(line))</span>
+   └─ 스트림 종료 시 <span class="str">event: done, data: [DONE]</span> 전송
+   └─ emitter.complete()</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="badge badge-frontend">Frontend</span> 로그 수신 및 표시</div>
+    <div class="code-block"><span class="comment">// useBuildLogStream 훅 (hooks/useBuilds.ts)</span>
+
+<span class="kw">1.</span> 빌드가 active 상태(Pending/Preparing/Building)이면:
+   └─ <span class="val">EventSource</span> 생성 → SSE 연결
+   └─ <span class="key">onmessage</span>: 수신된 line을 state 배열에 추가
+   └─ <span class="key">event: done</span>: 연결 종료
+
+<span class="kw">2.</span> 빌드가 완료 상태(Succeeded/Failed)이면:
+   └─ SSE 대신 <span class="val">useBuildLogs()</span>로 정적 로그 조회 (5초 폴링)
+   └─ <code>GET /builds/{ns}/{name}/logs</code> (text/plain)
+
+<span class="kw">3.</span> 빌드 상태 폴링:
+   └─ <span class="val">useBuild()</span>로 CR 상태 3초마다 조회
+   └─ phase 변화에 따라 UI 업데이트 (진행 단계 표시기)</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="badge badge-frontend">Frontend</span> BuildDetailPage 구성</div>
+    <table>
+      <tr><th style="width:30%">UI 요소</th><th>데이터 소스</th></tr>
+      <tr>
+        <td>빌드 상태 표시</td>
+        <td><code>useBuild(ns, name)</code> — 3초 폴링, phase/message/imageDigest 표시</td>
+      </tr>
+      <tr>
+        <td>진행 단계 인디케이터</td>
+        <td>GitHub Actions 스타일 step 표시 (Pending → Preparing → Building → 결과)</td>
+      </tr>
+      <tr>
+        <td>실시간 빌드 로그</td>
+        <td><code>useBuildLogStream(ns, name)</code> — SSE, 자동 스크롤</td>
+      </tr>
+      <tr>
+        <td>완료 후 로그</td>
+        <td><code>useBuildLogs(ns, name)</code> — 정적 텍스트, 5초 폴링 fallback</td>
+      </tr>
+      <tr>
+        <td>빌드 결과 (성공)</td>
+        <td>push된 이미지 경로 + imageDigest 표시</td>
+      </tr>
+      <tr>
+        <td>빌드 결과 (실패)</td>
+        <td>에러 메시지 (CR status.message) + 로그에서 원인 파악 가능</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<!-- ─── Section 6: Summary ─── -->
+<div class="section">
+  <div class="section-title"><span class="num">6</span> 주요 파일 요약</div>
+  <div class="card">
+    <table>
+      <tr><th>계층</th><th>파일</th><th>역할</th></tr>
+      <tr>
+        <td><span class="badge badge-frontend">FE</span></td>
+        <td><code>src/api/build.ts</code></td>
+        <td>빌드 API 클라이언트 (run, getLogs, list)</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-frontend">FE</span></td>
+        <td><code>src/hooks/useBuilds.ts</code></td>
+        <td>React Query 훅 (SSE 스트림, 상태 폴링)</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-frontend">FE</span></td>
+        <td><code>src/pages/build/BuildDetailPage.tsx</code></td>
+        <td>빌드 상세 UI (로그 뷰어, 진행 인디케이터)</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-backend">BE</span></td>
+        <td><code>imagebuild/controller/ImageBuildController.java</code></td>
+        <td>REST 엔드포인트 (trigger, status, logs, SSE)</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-backend">BE</span></td>
+        <td><code>imagebuild/service/ImageBuildService.java</code></td>
+        <td>CR 생성, Pod 로그 조회/스트리밍</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-controller">CTRL</span></td>
+        <td><code>reconciler/ImageBuildReconciler.java</code></td>
+        <td>상태 머신 (Pending→Preparing→Building→결과)</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-controller">CTRL</span></td>
+        <td><code>reconciler/KanikoJobFactory.java</code></td>
+        <td>Kaniko Job/Pod 스펙 생성 (볼륨, 컨테이너, args)</td>
+      </tr>
+      <tr>
+        <td><span class="badge badge-controller">CTRL</span></td>
+        <td><code>reconciler/ImageBuildStatusUpdater.java</code></td>
+        <td>CR status 서브리소스 패치 + K8s Event 기록</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+</div>
+</body>
+</html>
