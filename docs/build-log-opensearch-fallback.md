@@ -1,8 +1,15 @@
 # 빌드 로그 영구 조회 — OpenSearch fallback (작업 인계 문서)
 
 > 작성일: 2026-06-05
-> 상태: **설계 확정 / 구현 대기** (코드 미작성)
+> 상태: **구현 완료** (2026-06-09) — opensearch-java `3.0.0` 핀, `compileJava` 통과, 프론트 안내 문구 포함
 > 관련: [volume-build-context.html](volume-build-context.html), 메모리 `project-monitoring-logging-stack`
+
+> ## ✅ 구현 완료 요약 (2026-06-09)
+> - **백엔드**(`dockerizer-backend`): `OpenSearchProperties`/`OpenSearchConfiguration`/`OpenSearchBuildLogClient`(신규) + `ImageBuildService.getBuildLogs` 에 `ObjectProvider<OpenSearchBuildLogClient>` fallback. **0건이면 `ResourceNotFoundException`→404** 계약. dev/prod yaml, Helm(values/env-configmap/env-secret), install.sh(시크릿 복제 + `--set`/`--set-json` CA 마운트) 반영. opensearch-java **3.0.0**(httpclient5 5.5.x via Spring Boot 4 BOM). `compileJava` BUILD SUCCESSFUL, `helm template` 정상.
+> - **프론트**(`dockerizer-web`): `BuildDetailPage` 로그 박스 3-state(404 → "로그를 확인할 수 없습니다") + `useBuildLogs` 가 404 시 폴링 중단. i18n `build.logUnavailable`(ko/en). `npm run build` 통과.
+> - **핵심 계약**: `GET /logs` 는 Pod OR OpenSearch 에 로그 있으면 200(text), 둘 다 없으면(Pod GC + (OS 비활성 OR 0건)) **404 `ProblemDetail`**. 프론트는 이 404 를 react-query `error` 로 탐지(응답 body 파싱 의존 X).
+> - **Helm 볼륨 결정**: 기본 values 엔 OpenSearch CA 볼륨 미포함(시크릿 부재 시 Pod 기동 실패 방지). install.sh 가 `OPENSEARCH_ENABLED=true` 일 때만 `--set-json` 으로 `opensearch-certs`→`/opensearch-certs` 마운트 주입.
+> - **미반영(차기)**: SSE streamBuildLogs fallback, PIT+search_after 전체 페이지네이션(>maxLines), initContainer 로그(`container_name=kaniko` 필터), 배포 후 E2E 검증.
 
 이 문서는 "빌드 완료 후 로그가 사라지는 문제"를 OpenSearch로 해결하는 작업의 **모든 조사 결과 + 구현 TODO**를 담는다. 다음 세션에서 재조사 없이 바로 구현에 들어갈 수 있도록 작성했다.
 
