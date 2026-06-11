@@ -209,7 +209,7 @@ flowchart LR
 > - **대표적인 OCI 표준 라벨**: `title`(이름) · `version`(버전) · `authors`(작성자) · `licenses`(라이선스) · `url`·`documentation`·`source`(관련 링크) · `description`(설명) · `created`(생성 시각) · `revision`(소스 리비전) · `vendor`(공급자) · `base.name`(베이스 이미지) 등.
 > - **Dockerizer가 사용하는 라벨**
 >   - *사용자 입력 → Dockerfile에 기록*: `title`(Dockerfile 이름에서 자동) · `version`(빈 값이면 `latest`) · `authors`(기본=로그인 사용자) · `licenses` · `url` · `documentation` + 임의 커스텀 라벨.
->   - *자동 주입 → 빌드 시*: `created` · `revision` · `vendor` · `base.name` · `description`, 그리고 Dockerizer 고유 출처 라벨(`dockerizer.aipub.ten1010.io/dockerfile-id`·`dockerfile-revision-id`·`username`).
+>   - *자동 주입 → 빌드 시*: `created` · `revision` · `vendor` · `base.name` · `description`, 그리고 Dockerizer 고유 출처 라벨(`aipub.ten1010.io/dockerfile-id`·`dockerfile-revision-id`·`username`).
 > - 이미지 보안 스캔(취약점·SBOM)은 Dockerizer가 직접 수행하지 않고, 필요 시 AIPub의 Harbor/Trivy 결과를 활용한다.
 
 ### 제한 · 보류

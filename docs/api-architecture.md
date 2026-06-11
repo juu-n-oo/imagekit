@@ -47,7 +47,6 @@ Dockerizer는 AIPub의 선택적 플러그인으로, **기존 AIPub Ingress(`aip
 | `/api/v1alpha1/dockerfiles` | dockerizer-backend :8080 | Dockerfile CRUD |
 | `/api/v1alpha1/builds` | dockerizer-backend :8080 | 이미지 빌드 |
 | `/api/v1alpha1/volumes` | dockerizer-backend :8080 | AIPubVolume 조회/탐색 |
-| `/api/v1alpha1/registries` | dockerizer-backend :8080 | NGC/HuggingFace 레지스트리 |
 | `/dockerizer` | dockerizer-web :80 | 프론트엔드 정적 파일 |
 
 기존 AIPub 경로는 그대로 유지된다:

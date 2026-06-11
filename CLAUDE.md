@@ -31,7 +31,7 @@
 - k8s namespace `aipub`, ingress `aipub-brewery.cluster7.idc1.ten1010.io`, 외부 백엔드 서비스 `aipub-web-server`, `AIPub Volume` / `AIPub ImageHub`, copyright `©AIPub, TEN Inc`
 - DB username 기본값 `${DB_USERNAME:brewery}` (DB *이름* 만 `dockerizer` 로 변경)
 
-본 프로젝트 고유의 CRD API group 은 `dockerizer.aipub.ten1010.io` 로 변경됨 (`.aipub.ten1010.io` 접미사는 유지).
+ImageBuild CRD 및 dockerizer 가 부여하는 라벨/어노테이션은 **코어 AIPub group `aipub.ten1010.io`** 를 따른다 (CRD: `imagebuilds.aipub.ten1010.io`, 라벨: `aipub.ten1010.io/dockerfile-id` 등). 이는 dockerizer 가 향후 aipub backend 로 통합될 것을 전제로, 코어 AIPub 리소스(`workspaces`/`operations`/`aipubvolumes` 등)와 동일한 group 에 편입하는 결정이다. (이전에는 `dockerizer.aipub.ten1010.io` 서브도메인을 썼으나 `aipub.ten1010.io` 로 이관함 — 이미 배포된 `imagebuilds.dockerizer.aipub.ten1010.io` CRD 가 있다면 새 group 으로 재생성·CR 마이그레이션이 필요하고, `aipub.ten1010.io` group 은 플랫폼 소유이므로 AIPub 플랫폼팀과의 조율이 전제된다.)
 
 ## 4. 작업 시 참조 우선순위
 

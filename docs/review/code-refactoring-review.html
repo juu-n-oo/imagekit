@@ -1,0 +1,284 @@
+<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Dockerizer 코드 리팩토링 리뷰</title><link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css'><style>
+:root{--accent:#1d63ed;--accent2:#16b1ff;--accent-soft:#e9f0fe;--ink:#161d2b;--muted:#5d6878;
+--border:#e4e8ef;--bg:#eceff5;--green:#0f7a50;--green-soft:#e6f6ee;--amber:#9a5a08;}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-size:16.5px;line-height:1.78;
+font-family:"Pretendard Variable",Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;}
+.wrap{max-width:940px;margin:0 auto;padding:48px 20px 110px;}
+.card{position:relative;background:#fff;border:1px solid var(--border);border-radius:18px;padding:52px 56px;
+box-shadow:0 1px 3px rgba(20,40,80,.04),0 10px 40px rgba(20,40,80,.06);}
+.card::before{content:"";position:absolute;inset:0 0 auto 0;height:5px;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:18px 18px 0 0;}
+.eyebrow{font-size:.72rem;font-weight:800;letter-spacing:.18em;color:var(--accent);text-transform:uppercase;margin:4px 0 2px;}
+h1{font-size:2rem;font-weight:800;margin:.1em 0 .3em;letter-spacing:-.01em;}
+h2{font-size:1.4rem;font-weight:750;margin:2.5em 0 .8em;padding:.1em 0 .1em .7em;border-left:5px solid var(--accent);}
+h3{font-size:1.08rem;margin:1.7em 0 .5em;color:var(--accent);font-weight:750;}
+hr{border:none;border-top:1px solid var(--border);margin:2.6em 0;}
+a{color:var(--accent);text-decoration:none;border-bottom:1px solid transparent;}a:hover{border-bottom-color:currentColor;}
+p,li{font-size:1rem;}strong{font-weight:700;color:#0c1730;}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#eef1f7;padding:.12em .45em;
+border-radius:6px;font-size:.84em;color:#1452c4;border:1px solid #e1e6f1;}
+pre code{display:block;white-space:pre;padding:16px 18px;background:#0f172a;color:#e6edf6;border:none;border-radius:12px;overflow:auto;font-size:.82em;line-height:1.6;}
+blockquote{margin:1.3em 0;padding:14px 18px;background:#f5f8fd;border-left:4px solid #cdd9f2;border-radius:0 10px 10px 0;color:#33405a;}
+.tablewrap{overflow-x:auto;margin:1.3em 0;border:1px solid var(--border);border-radius:12px;}
+table{border-collapse:collapse;width:100%;font-size:.93rem;}
+th,td{padding:11px 15px;text-align:left;vertical-align:top;border-bottom:1px solid var(--border);}
+th{background:#f3f6fc;color:#0e213f;font-weight:700;border-bottom:2px solid #dde6f6;}
+tbody tr:last-child td{border-bottom:none;}tbody tr:hover td{background:#f8faff;}
+table.meta th{width:120px;background:#fafbfe;color:var(--muted);font-weight:600;}
+.sev{display:inline-block;font-size:.72rem;font-weight:800;letter-spacing:.02em;padding:2px 9px;border-radius:6px;color:#fff;white-space:nowrap;vertical-align:.05em;}
+.sev.c{background:#d11f3a;}.sev.h{background:#e07a0c;}.sev.m{background:#caa008;color:#3a2e00;}.sev.l{background:#7a8696;}.sev.ok{background:#0f7a50;}
+.finding{margin:1.1em 0;padding:16px 20px;background:#fbfcfe;border:1px solid #e5eaf2;border-left:4px solid var(--accent);border-radius:10px;}
+.finding.c{border-left-color:#d11f3a;background:#fdf3f4;}
+.finding.h{border-left-color:#e07a0c;background:#fdf7ef;}
+.finding.m{border-left-color:#caa008;background:#fdfbef;}
+.finding.l{border-left-color:#7a8696;background:#f8f9fb;}
+.finding>.t{display:block;font-weight:750;color:#0c1730;margin-bottom:6px;font-size:1.02rem;}
+.finding .rec{margin-top:8px;padding-top:8px;border-top:1px dashed #dbe2ee;font-size:.95rem;}
+.finding .rec b{color:var(--green);}
+ul.good{list-style:none;padding:14px 18px 14px 16px;background:var(--green-soft);border:1px solid #bfe6d2;border-radius:12px;}
+ul.good li{position:relative;padding-left:1.6em;margin:.45em 0;}
+ul.good li::before{content:"✓";position:absolute;left:.1em;color:var(--green);font-weight:800;}
+.foot{text-align:center;color:var(--muted);font-size:.78rem;margin-top:30px;}
+.legend{font-size:.85rem;color:var(--muted);}
+@media(max-width:640px){.card{padding:30px 20px;border-radius:14px;}h1{font-size:1.6rem;}.wrap{padding:28px 14px 80px;}}
+@media print{body{background:#fff;font-size:11pt;}.wrap{padding:0;max-width:none;}.card{border:none;box-shadow:none;border-radius:0;padding:0;}.card::before{display:none;}a{border:none;}}
+</style></head><body><div class='wrap'><article class='card'>
+<div class='eyebrow'>Refactoring Review</div>
+<h1>Dockerizer 코드 리팩토링 리뷰</h1>
+<table class='meta'><tbody>
+<tr><th>작성일</th><td>2026-06-11</td></tr>
+<tr><th>대상</th><td><code>dockerizer-backend</code> (099c84a) · <code>dockerizer-web</code> (e569ad0)</td></tr>
+<tr><th>범위</th><td>유지보수성 관점의 <b>리팩토링 포인트</b> (코드 스멜·중복·관심사 분리·타입 안전성·테스트)</td></tr>
+<tr><th>식별자</th><td><code>SRV-n</code> 백엔드 서버 · <code>CTL-n</code> ImageBuild 컨트롤러 · <code>WEB-n</code> 프론트엔드</td></tr>
+<tr><th>원본</th><td><a href='code-refactoring-review.md'>code-refactoring-review.md</a> (동일 내용)</td></tr>
+<tr><th>관련</th><td><a href='backend-architecture-review.md'>backend-architecture-review.md</a> (아키텍처·보안 인가)</td></tr>
+</tbody></table>
+
+<p>아키텍처 적정성/보안 인가는 별도 <a href='backend-architecture-review.md'>아키텍처 리뷰</a>에서 다룬다. 본 문서는 <strong>유지보수성</strong>에 집중한다. <code>aipub</code>/<code>brewery</code> 및 <code>aipub.ten1010.io</code> 라벨 키는 외부 연동을 위해 <b>의도적으로 보존</b>되는 값이므로 리네임 대상이 아니다.</p>
+<p class='legend'>심각도: <span class='sev h'>High</span> 유지보수/정확성에 실질적 해 · <span class='sev m'>Medium</span> 명확한 개선 · <span class='sev l'>Low</span> 사소/제안</p>
+
+<h2>0. 요약</h2>
+<div class='tablewrap'><table>
+<thead><tr><th>영역</th><th>High</th><th>Medium</th><th>Low</th><th>합계</th></tr></thead>
+<tbody>
+<tr><td>백엔드 서버 (SRV)</td><td>4</td><td>6</td><td>3</td><td><b>13</b></td></tr>
+<tr><td>ImageBuild 컨트롤러 (CTL)</td><td>2</td><td>4</td><td>4</td><td><b>10</b></td></tr>
+<tr><td>프론트엔드 (WEB)</td><td>6</td><td>8</td><td>7</td><td><b>21</b></td></tr>
+</tbody></table></div>
+<p>기능 동작 자체는 견고하다. 리팩토링 여지는 주로 <strong>(1) 단일 진실원본 부재</strong>(라벨/상수/CR 모델/포맷 헬퍼가 모듈·페이지마다 재정의), <strong>(2) 타입 안전성 우회</strong>(<code>Map&lt;String,Object&gt;</code>+Gson 왕복, <code>unknown</code>/<code>as</code> 캐스트), <strong>(3) 거대 컴포넌트/메서드</strong>(에디터 페이지 1.9k 라인), <strong>(4) 반쪽짜리 i18n 채택</strong>, <strong>(5) 핵심 로직(컨트롤러 reconcile·CR 매핑)의 테스트 공백</strong>에 집중된다.</p>
+<blockquote><b>가장 효과가 큰 통합</b> — 백엔드의 <code>ImageBuildConstants</code>·CR 모델·라벨 키·<code>K8sProperties</code> 를 <b>공유 Gradle 모듈</b>로 추출하면 SRV-1·SRV-2·SRV-3·SRV-6·CTL-4 가 한 번에 해소된다(이미 drift 발생 — 컨트롤러 <code>ImageBuildSpec</code> 엔 <code>imageLabels</code> 가 있으나 서버엔 없음). 프론트는 <code>src/lib/</code>(format·build-phase·dockerfile-content) + <code>&lt;Pagination&gt;</code>/<code>useTableSelection</code> 추출이 동급 효과.</blockquote>
+
+<h2>1. 공통 횡단 테마</h2>
+<ol>
+<li><b>단일 진실원본 부재</b> — <code>aipub.ten1010.io/*</code> 라벨 키가 백엔드 서버·컨트롤러(3파일)·프론트에서 각자 private 리터럴로 <b>3중 이상 재정의</b>. 컴파일 검증이 없어 한쪽 변경이 조용히 연동을 깬다.</li>
+<li><b>타입 안전성 우회</b> — 백엔드는 <code>Map&lt;String,Object&gt;</code> + <code>gson.toJson→fromJson</code> 왕복, 프론트는 <code>cr: unknown</code>/<code>spec:{[key]:unknown}</code>/<code>as Record</code> 로 CR 을 사실상 무타입 처리.</li>
+<li><b>중복 헬퍼</b> — 백엔드: 예외 변환·<code>parseLong</code>·path 정규화. 프론트: 날짜/age/duration 포맷, 이미지명 단축, 페이지네이션/선택, <code>(e as Error).message</code>.</li>
+<li><b>예외/오류 처리 비일관</b> — 백엔드는 404 만 도메인 예외로 매핑, 나머지는 <code>RuntimeException("...: "+responseBody)</code> 로 <b>원문 노출 + 일반 fallback 부재</b>. 프론트는 <code>k8s.ts</code> 가 <code>api-client.ts</code> 와 별개 래퍼 중복.</li>
+<li><b>테스트 공백</b> — 컨트롤러 모듈은 컨텍스트 로드 테스트 1개뿐, 서버 CR 매핑도 직접 테스트 없음. 가장 회귀 위험이 큰 코드가 미검증.</li>
+</ol>
+
+<h2>2. 백엔드 서버 (<code>dockerizer-backend-server</code>)</h2>
+
+<div class='finding h'><span class='t'><span class='sev h'>High</span> SRV-1 — 무타입 Map + Gson 왕복 파싱</span>
+<code>ImageBuildService</code> 의 <code>listBuilds</code>/<code>getCrMap</code> 이 <code>Object→Map&lt;String,Object&gt;</code> 로 캐스팅(unchecked 다수)하고, <code>crMapToResponse</code> 가 metadata/labels 를 손으로 파헤친 뒤 <code>parseStatus</code>/<code>parseSpec</code> 이 <code>gson.fromJson(gson.toJson(obj),…)</code> 로 이미 존재하는 타입 클래스에 재직렬화한다. 호출마다 이중 직렬화 + 흩어진 캐스트.
+<div class='rec'><b>권장</b> — <code>ImageBuildResource</code> 를 공유 모델로 승격해 <code>GenericKubernetesApi</code> 로 통째 역직렬화하거나, 최소 <code>CrMapAccessor</code> 헬퍼로 캐스트·Gson 왕복을 한 곳(+테스트)에 가둔다.</div></div>
+
+<div class='finding h'><span class='t'><span class='sev h'>High</span> SRV-2 — 라벨/어노테이션 상수 3중 정의</span>
+<code>ImageBuildService</code>·<code>KanikoJobFactory</code>·<code>InformerControllerConfiguration</code>·<code>ImageBuildReconciler</code>·프론트가 동일 <code>aipub.ten1010.io/*</code> 키를 각자 리터럴로 정의. 한쪽 오타/리네임이 list/status 상관을 말없이 깨뜨림.
+<div class='rec'><b>권장</b> — 모든 라벨/어노테이션 키 + <code>MANAGER_NAME</code> 를 공유 <code>ImageBuildConstants</code> 로 이동(SRV-3 과 묶어 처리).</div></div>
+
+<div class='finding h'><span class='t'><span class='sev h'>High</span> SRV-3 — 모듈 간 CR 모델·상수 중복 (이미 drift)</span>
+서버·컨트롤러의 <code>ImageBuildConstants</code> 가 거의 동일, <code>ImageBuildSpec</code>/<code>ImageBuildStatus</code> 도 중복인데 <b>서버 <code>ImageBuildSpec</code> 엔 <code>imageLabels</code> 필드가 누락</b>. <code>K8sProperties</code> 는 두 모듈 바이트 단위 동일. 와이어 계약의 진실원본이 둘.
+<div class='rec'><b>권장</b> — <code>dockerizer-cr-model</code>/<code>dockerizer-common</code> Gradle 모듈로 CR 클래스·상수·<code>K8sProperties</code> 공유.</div></div>
+
+<div class='finding h'><span class='t'><span class='sev h'>High</span> SRV-4 — GlobalExceptionHandler 일반 fallback 부재 + 원문 노출</span>
+<code>RuntimeException</code>/<code>Exception</code> catch-all 이 없는데, k8s/proxy 실패 경로가 일제히 <code>RuntimeException("...: " + e.getResponseBody())</code> 를 던져 <b>k8s 원문을 body 에 노출한 채 500</b> 으로 표출. 나머지 <code>ProblemDetail</code> 스타일과 비일관.
+<div class='rec'><b>권장</b> — 클라이언트가 던지는 도메인 예외(<code>UpstreamServiceException</code>)를 <code>502/503 ProblemDetail</code> 로 매핑하고, <code>@ExceptionHandler(Exception.class)</code> 로 정제된 500(원문 로깅만, body 미노출) 추가.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> SRV-5 — ApiException→RuntimeException 변환 중복</span>
+<code>404→ResourceNotFound, 기타→RuntimeException(responseBody)</code> 패턴이 <code>getCrMap</code>·<code>getBuildLogs</code>·<code>findBuildPodName</code>·<code>K8sAipubVolumeClient</code> 에 반복.
+<div class='rec'><b>권장</b> — <code>K8sExceptions.translate(ApiException, context)</code> 정적 헬퍼로 일원화.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> SRV-6 — findBuildPodName 이 Job 이름·라벨 직접 재유도</span>
+<code>name + "-job"</code>, <code>"job-name=" + jobName</code> 하드코딩. 컨트롤러가 접미사/라벨링을 바꾸면 pod 조회가 조용히 빈 결과 → 잘못된 404/fallback. 컨트롤러는 이미 pod 에 <code>imagebuild-name</code> 라벨을 단다.
+<div class='rec'><b>권장</b> — 명명 헬퍼 공유 + 암묵적 <code>job-name</code> 대신 컨트롤러 소유 라벨(<code>imagebuild-name</code>)로 pod 선택.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> SRV-7 — getBuildLogs 가 분기를 예외로 처리</span>
+404 를 <code>ResourceNotFoundException</code> 으로 바꿔 던진 뒤 <b>같은 메서드 바깥 try 에서 즉시 catch</b> 해 OpenSearch fallback 트리거. throw-then-catch-locally 흐름이 난해.
+<div class='rec'><b>권장</b> — <code>findBuildPodName</code> 을 <code>Optional</code> 반환으로, <code>pod 있음→live(404→fallback) / 없음→fallback</code> 의 선형 구조로.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> SRV-8 — logStreamExecutor 무제한 cached pool · 미종료</span>
+<code>newCachedThreadPool()</code> 상한 없음 → SSE 폭주 시 스레드 고갈, <code>@PreDestroy</code> 부재로 셧다운 시 누수. 중첩 <code>catch(Exception ignored)</code> 의도 모호.
+<div class='rec'><b>권장</b> — 상한 있는 <code>ThreadPoolTaskExecutor</code> 빈(named + queue cap) + <code>@PreDestroy</code> 종료.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> SRV-9 — 레지스트리 파서의 무타입 Map</span>
+<code>NgcRegistryService</code>·<code>HuggingfaceRegistryService</code> 가 <code>Map&lt;String,Object&gt;</code> 로 <code>results</code>/<code>tags</code>/<code>count</code> unchecked 캐스트(SRV-1 동형). <code>encodeCredentials</code> 는 inline <code>Base64</code> + 기본 charset.
+<div class='rec'><b>권장</b> — 레지스트리별 타입 record 로 Jackson 직접 바인딩, <code>StandardCharsets.UTF_8</code> 명시.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> SRV-10 — VolumeBrowserService 관심사 혼재 + ls 파싱 취약</span>
+<code>parseLine</code> 이 <code>ls -lan</code> 을 공백 9칼럼으로 분해 → 공백 파일명·로캘 날짜·심링크에서 오파싱. 290여 라인이 exec·WebSocket·멀티파트·경로검증 모두 소유.
+<div class='rec'><b>권장</b> — <code>PodExec</code>·<code>LsOutputParser</code>(독립 테스트) 분리, 구분자 안전한 <code>stat</code>/<code>find -printf</code> 검토.</div></div>
+
+<div class='finding l'><span class='t'><span class='sev l'>Low</span> SRV-11 — 경로 유틸·parseLong 중복</span>
+<code>VolumeBrowserService.parseLong</code> 와 <code>ImageBuildService.parseLong</code> 중복, <code>validatePath</code>/<code>normalizePath</code> 가 같은 경로를 두 함수로 추론.
+<div class='rec'><b>권장</b> — 공유 <code>PathUtils</code>/<code>SafePath</code>, 단일 <code>parseLongOrNull</code>.</div></div>
+
+<div class='finding l'><span class='t'><span class='sev l'>Low</span> SRV-12 — MCP actor 귀속 비일관 (관련 주석은 본 패스에서 수정)</span>
+<code>updateDockerfile</code> 은 actor 를 <code>"mcp-tool"</code> 리터럴로 고정하나 <code>createDockerfile</code> 은 <code>username</code> 파라미터를 받음. (<code>ImageBuildController</code> 의 "MCP triggerImageBuild 로 여전히 제공" 주석은 도구 제거와 어긋났던 것을 본 리뷰 패스에서 바로잡음.)
+<div class='rec'><b>권장</b> — MCP actor 귀속 방식 통일.</div></div>
+
+<div class='finding l'><span class='t'><span class='sev l'>Low</span> SRV-13 — AipubAuthenticationFilter 광범위 catch (인가 후순위 — 참고)</span>
+<code>catch(Exception)</code> 후 로깅만 → AIPub 일시 장애와 잘못된 쿠키가 구분 안 됨. 인가 정비 시 함께 재검토할 알려진 스멜로만 기록.</div>
+
+<h2>3. ImageBuild 컨트롤러 (<code>imagebuild-controller</code>)</h2>
+
+<div class='finding h'><span class='t'><span class='sev h'>High</span> CTL-1 — configMapExists/jobExists 가 모든 ApiException 을 false 로 삼킴</span>
+존재 검사가 500/timeout/403 을 깨끗한 404 와 동일하게 "없음" 으로 결론 → create 시도. 보통 409 catch 로 생존하나, <b>비-404 read 오류에 이어 비-409 create 오류가 나면 일시 장애로도 빌드를 <code>markFailed</code></b> 할 수 있다. (아키텍처 리뷰 C-8)
+<div class='rec'><b>권장</b> — 404(→false)/기타(→rethrow, <code>reconcile</code> 가 requeue) 구분. 더 낫게는 사전 검사 제거 + create/409 의존(이미 처리됨)으로 read 왕복·삼킴 동시 제거.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> CTL-2 — handleBuilding 비-404 오류가 requeue 없이 no-op</span>
+Job 읽기 비-404 시 로깅 후 미재시도. resync 로 자가 치유되나 종료 감지 구간 일시 read 실패엔 <code>Result(true)</code> requeue 가 더 정확.
+<div class='rec'><b>권장</b> — 비-404 rethrow(바깥 catch requeue) 또는 명시적 requeue 결과 반환.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> CTL-3 — KanikoJobFactory 의 장황한 명령형 빌더</span>
+<code>kanikoContainer</code> 가 <code>hasBuildContext</code> 분기를 교차로 엮어 dockerfile 마운트 구성을 중복, <code>createKanikoJob</code> 은 깊게 중첩된 단일 표현식.
+<div class='rec'><b>권장</b> — <code>buildArgs</code>·<code>buildMounts</code>·<code>labelArgs</code> 로 추출(현재 미검증 args 생성을 단위 테스트 가능하게).</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> CTL-4 — 팩토리 전반의 매직 문자열</span>
+apiVersion/kind/policy(<code>"v1"</code>,<code>"ConfigMap"</code>,<code>"batch/v1"</code>,<code>"Job"</code>,<code>"Never"</code>,<code>"File"</code>), 마운트 경로(<code>/kaniko-config</code>,<code>/build-context</code>,<code>/workspace</code>,<code>/kaniko/.docker</code>), configmap 키 <code>"Dockerfile"</code>, <code>-job</code>/<code>-dockerfile</code> 접미사가 raw 문자열로 산재.
+<div class='rec'><b>권장</b> — named 상수로 승격(SRV-2/3 공유 모듈과 연계).</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> CTL-5 — ImageBuildStatusUpdater 의 Gson 왕복 + patch 실패 삼킴</span>
+<code>Map.of("status", gson.fromJson(gson.toJson(status), Map.class))</code> 이중 직렬화. <code>ApiException</code> 시 로깅만 → 호출부는 전환 성공으로 오인, CR 은 이전 phase 에 머물러 resync 때만 재시도(조용한 실패). merge-patch 라 필드 클리어 불가(우연히 동작).
+<div class='rec'><b>권장</b> — 타입 status 직접 patch 직렬화(Map 우회 제거), patch 실패 시 throw 해 requeue 유도, merge-patch 보존 가정 문서화.</div></div>
+
+<div class='finding l'><span class='t'><span class='sev l'>Low</span> CTL-6 — transitionTo 의 도달 불가 terminal 처리</span>
+실제 종료는 전용 <code>markSucceeded</code>/<code>markFailed</code> 로만 구동되어 <code>transitionTo</code> 의 terminal 분기는 사실상 dead.
+<div class='rec'><b>권장</b> — <code>markSucceeded</code>/<code>markFailed</code> 가 단일 <code>applyStatus</code> 에 위임, <code>transitionTo</code> 의 unreachable terminal 처리 제거.</div></div>
+
+<div class='finding h'><span class='t'><span class='sev h'>High</span> CTL-7 — 컨트롤러 모듈 테스트 거의 없음</span>
+<code>src/test</code> 에 컨텍스트 로드 1개뿐. <code>ImageBuildReconciler</code>(phase 머신·409 멱등·digest·timeout 분기), <code>KanikoJobFactory</code>(args/mount/subPath·라벨 정렬), <code>ImageBuildStatusUpdater</code>, <code>enqueueOwner</code> 모두 <b>무테스트</b> — 로직 밀도·회귀 위험 최고.
+<div class='rec'><b>권장</b> — Mockito 로 <code>CoreV1Api</code>/<code>BatchV1Api</code>/<code>CustomObjectsApi</code> 모킹한 reconcile 전환 테스트 + <code>KanikoJobFactory</code>·<code>extractFailureMessage</code>·<code>resolveBuildTimeoutSeconds</code> 순수 단위 테스트.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> CTL-8 — 서버 CR 매핑 경로도 무테스트</span>
+<code>ImageBuildControllerDocsTest</code> 는 service 모킹 REST-docs 테스트라 <code>crMapToResponse</code>/<code>parseStatus</code>/<code>parseSpec</code>/<code>parseInstant</code>/<code>parseLong</code> 에 직접 테스트 없음.
+<div class='rec'><b>권장</b> — status 누락·null 타임스탬프·잘못된 라벨 숫자 등 대표 CR <code>Map</code> 픽스처를 <code>crMapToResponse</code> 에 흘려보내는 단위 테스트.</div></div>
+
+<div class='finding l'><span class='t'><span class='sev l'>Low</span> CTL-9 — EventRecorder 의 core/v1 · events.k8s.io 혼용</span>
+<code>eventTime</code> 와 legacy <code>firstTimestamp</code>/<code>lastTimestamp</code>, <code>source.component</code> 와 <code>reportingComponent</code> 동시 설정 → 동작하나 중복.
+<div class='rec'><b>권장</b> — modern 또는 legacy 한쪽으로 통일.</div></div>
+
+<div class='finding l'><span class='t'><span class='sev l'>Low</span> CTL-10 — boxed Integer/Boolean 언박싱 NPE 표면</span>
+<code>ControllerProperties</code> 가 모두 boxed + 기본값인데 언박싱 사용(<code>resyncPeriodSeconds * 1000L</code> 등). YAML 빈 값 시 null → 시작 NPE.
+<div class='rec'><b>권장</b> — primitive <code>int</code>/<code>boolean</code> 필드 + 기본값(Spring 바인딩 정상).</div></div>
+
+<h2>4. 프론트엔드 (<code>dockerizer-web</code>)</h2>
+
+<div class='finding h'><span class='t'><span class='sev h'>High</span> WEB-1 — DockerfileEditorPage.tsx 1,891줄 god-component</span>
+순수 헬퍼(<code>parseDockerfileContent</code>/<code>generateDockerfileContent</code>/<code>buildLabelLines</code>)부터 <code>~20 useState + 7 useEffect</code>, 폼 제출, 빌드/저장 다이얼로그, 이미지 셀렉터, 두 개의 큰 중첩 JSX 다이얼로그까지 한 파일이 소유. 단위 테스트 불가 + 최고 churn 위험.
+<div class='rec'><b>권장</b> — 순수 함수 → <code>src/lib/dockerfile-content.ts</code>, <code>&lt;BuildDialog&gt;</code>/<code>&lt;SaveRevisionDialog&gt;</code>/<code>&lt;LabelEditor&gt;</code> 컴포넌트 추출, 동기화·dirty 추적은 <code>useDockerfileEditorState</code> 훅. 목표: 페이지 &lt; 300줄.</div></div>
+
+<div class='finding h'><span class='t'><span class='sev h'>High</span> WEB-2 — handleBuild 내 빌드 옵션/다이얼로그 정리 3중 중복</span>
+<code>mutate(..., {onSuccess,onError})</code> + 동일 <code>setShowBuildDialog(false); …; navigate(...)</code> 정리가 EDIT/CREATE-성공/CREATE-실패 3경로 반복. "COPY 볼륨 자동 감지" 도 두 버튼에 복붙.
+<div class='rec'><b>권장</b> — 기존 <code>startBuild(df)</code> 클로저로 경로 라우팅, 볼륨 감지를 <code>resolveBuildContextVolume()</code> 로 추출, 다이얼로그 정리를 단일 <code>finishBuild</code> 로.</div></div>
+
+<div class='finding h'><span class='t'><span class='sev h'>High</span> WEB-3 — phaseConfig 가 형태 다른 채 두 번 정의 + phase 순서 하드코딩</span>
+<code>BuildDetailPage</code>(<code>{label,variant,icon}</code>)와 <code>BuildListPage</code>(<code>{label,color,dotClass}</code>)가 phase→라벨/색을 각자 정의, 한국어 라벨 양쪽 하드코딩, 순서 배열·<code>buildSteps</code> 인라인.
+<div class='rec'><b>권장</b> — <code>src/lib/build-phase.ts</code> 에 단일 <code>BUILD_PHASES</code> + <code>phaseMeta</code>(라벨은 <code>t()</code>) 두고 두 페이지 공유.</div></div>
+
+<div class='finding h'><span class='t'><span class='sev h'>High</span> WEB-4 — 죽은/잘못된 i18n build.phase.* 키</span>
+locale <code>build.phase</code> 가 <code>Pending/Running/Succeeded/Failed</code> 인데 <code>BuildPhase</code> 는 <code>Pending|Preparing|Building|Succeeded|Failed</code> — <b><code>Running</code> 없음, <code>Preparing</code>/<code>Building</code> 누락</b>, 사용처 0.
+<div class='rec'><b>권장</b> — 블록 삭제 또는(권장: WEB-3 과 함께) 실제 union 에 맞춰 정렬해 정식 라벨 소스로.</div></div>
+
+<div class='finding h'><span class='t'><span class='sev h'>High</span> WEB-5 — i18n 우회 한국어 하드코딩 만연</span>
+에디터·<code>BuildDetailPage</code>·리스트 페이지·<code>ImageSelector</code> 등에서 수백 문자열이 인라인 한국어(locale 은 ~30키뿐). <b>반쪽 i18n 은 미적용보다 나쁘다</b> — <code>en</code> 사용자가 영어/한국어를 섞어 봄.
+<div class='rec'><b>권장</b> — 우선순위 페이지부터 <code>editor.*</code>/<code>build.*</code>/<code>common.*</code> 로 스윕, 반복 리터럴(<code>'모든 프로젝트'</code> 등) 공유 키화.</div></div>
+
+<div class='finding h'><span class='t'><span class='sev h'>High</span> WEB-6 — api/k8s.ts 가 apiClient 대신 fetch 래퍼 재구현</span>
+<code>k8sRequest</code> 가 <code>api-client.ts</code> 의 <code>request</code> 를 통째 중복. CR 호출만 자체 래퍼라 <b>HTTP 계층 이원화</b>. <code>k8sRequest</code> 는 RFC-7807 <code>detail</code> 무시 → CR 오류는 불투명 코드, 백엔드 오류는 가독 메시지로 비일관. 401 리다이렉트 3곳 복붙.
+<div class='rec'><b>권장</b> — <code>apiClient</code> 에 base path 옵션(또는 동일 <code>request</code> 기반 <code>k8sClient</code>) 추가해 일원화 + <code>k8sRequest</code> 제거.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> WEB-7 — 날짜/age/duration/이미지명 헬퍼 중복</span>
+<code>formatDateTime</code>(3곳), <code>formatCreatedAt</code>, <code>formatAge</code>, <code>formatDuration</code>, <code>shortenImageName</code>/<code>shortenImage</code>(<code>&gt;2</code> vs <code>&gt;=3</code> 불일치)가 복붙.
+<div class='rec'><b>권장</b> — <code>src/lib/format.ts</code> 로 통합, 단축 동작 차이 정리.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> WEB-8 — PageBtn·페이지네이션·선택 로직 중복</span>
+<code>PageBtn</code> 과 페이지네이션 JSX, <code>toggleAll</code>/<code>toggleOne</code>/<code>buildKey</code> 선택 Set 로직이 두 리스트 페이지에 거의 동일.
+<div class='rec'><b>권장</b> — <code>&lt;Pagination&gt;</code> 컴포넌트 + <code>useTableSelection&lt;T&gt;</code> 훅 추출.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> WEB-9 — CR 처리의 타입 안전성 공백</span>
+<code>createImageBuild(cr: unknown)</code>, <code>spec:{targetImage; [key]:unknown}</code>, <code>imageLabels as Record</code> 캐스트, <code>InstructionBlock</code> 의 <code>volumes?: unknown</code>(선언만, 미사용).
+<div class='rec'><b>권장</b> — 제대로 된 <code>ImageBuildSpec</code> 인터페이스 + 생성용 <code>ImageBuildCrInput</code> 타입, 미사용 <code>volumes</code> prop 제거.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> WEB-10 — run/rebuild 의 CR 조립 중복</span>
+두 함수가 동일 <code>{apiVersion,kind,metadata:{generateName,namespace,labels,annotations},spec}</code> 골격을 각자 조립.
+<div class='rec'><b>권장</b> — <code>makeImageBuildCr({namespace,labels,annotations,spec})</code> 헬퍼 추출.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> WEB-11 — 폴링·timeout 경계의 매직 넘버</span>
+<code>3000</code>/<code>5000</code> 폴링, 타임아웃 clamp <code>Math.min(360,Math.max(1,…||60))</code> 가 input <code>min/max</code> 와 따로 존재, <code>5*60*1000</code> staleTime 중복.
+<div class='rec'><b>권장</b> — <code>BUILD_POLL_MS</code>/<code>LOG_POLL_MS</code>/<code>BUILD_TIMEOUT_{MIN,MAX,DEFAULT}</code> named 상수 공유.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> WEB-12 — 쿼리 키 형태 비일관</span>
+<code>[KEY,{project}]</code> vs <code>[KEY,ns,name]</code>(위치형) vs <code>[...,'logs']</code> 혼재. invalidate 가 prefix 매칭에 의존.
+<div class='rec'><b>권장</b> — 쿼리 키 팩토리(<code>buildKeys.list/detail/logs</code>) 채택.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> WEB-13 — mutation 오류 처리 비일관</span>
+create/update 엔 <code>onError</code> 토스트가 있으나 <b>EDIT 경로 <code>runBuildMutation</code> 엔 없음</b> → 실패가 조용히 무시. <code>useRebuild</code> 도 오류 표면 없음 → 재빌드 실패 비가시.
+<div class='rec'><b>권장</b> — QueryClient 기본 <code>onError</code> 또는 <code>useMutationToast</code> 표준화, 최소 EDIT/rebuild 에 <code>onError</code> 추가.</div></div>
+
+<div class='finding m'><span class='t'><span class='sev m'>Medium</span> WEB-14 — (e as Error).message 캐스트 반복</span>
+에디터 토스트 4곳 + <code>api-client.ts</code> 가 무타입 <code>any</code> 에서 <code>message</code>/<code>detail</code> 을 읽음.
+<div class='rec'><b>권장</b> — <code>getErrorMessage(e: unknown): string</code> 유틸 통일, ProblemDetail 타입화.</div></div>
+
+<div class='finding l'><span class='t'><span class='sev l'>Low</span> WEB-15 — form↔editor 전환 시 미지원 지시자 소실</span>
+<code>switchToForm</code> 이 재파싱·재생성하며 ENTRYPOINT/ARG/multistage 드롭(문서화됨). 의도적이나 데이터 소실 footgun.
+<div class='rec'><b>권장</b> — 전환 시 콘텐츠 소실 경고 가드 검토.</div></div>
+
+<div class='finding l'><span class='t'><span class='sev l'>Low</span> WEB-16 — instrTypeOptions 라벨/설명/아이콘 한국어 하드코딩</span>
+WEB-5 의 i18n 공백이 표시 문자열을 config 배열에 결합.
+<div class='rec'><b>권장</b> — i18n 으로 접기.</div></div>
+
+<div class='finding l'><span class='t'><span class='sev l'>Low</span> WEB-17 — getStepStatus 가 매 호출 phase 배열 재할당</span>
+<code>['Pending','Preparing','Building','Push']</code> 를 함수 내부에서 step·render 마다 할당.
+<div class='rec'><b>권장</b> — 모듈 상수로 호이스트(WEB-3 연계).</div></div>
+
+<div class='finding l'><span class='t'><span class='sev l'>Low</span> WEB-18 — BuildDetailPage 날짜만 toLocaleString('ko-KR')</span>
+다른 두 페이지의 수동 패딩과 같은 개념(생성 시각)에 다른 포맷.
+<div class='rec'><b>권장</b> — <code>lib/format.ts</code>(WEB-7)로 통일.</div></div>
+
+<div class='finding l'><span class='t'><span class='sev l'>Low</span> WEB-19 — ImageSelector catalog placeholder + 죽은 NGC/HF 코드</span>
+<code>catalog</code> 탭이 영구 "준비 중" placeholder, 대응 <code>useNgc*</code>/<code>useHuggingface*</code> 훅·<code>k8s.ts</code> 레지스트리 메서드가 어디서도 import 안 되는 dead code 로 보임.
+<div class='rec'><b>권장</b> — 확인 후 catalog 보류면 제거.</div></div>
+
+<div class='finding l'><span class='t'><span class='sev l'>Low</span> WEB-20 — env 읽기 중복</span>
+<code>VITE_HARBOR_URL</code> 양쪽, <code>API_BASE_URL</code> 유도가 <code>k8s.ts</code>·<code>api-client.ts</code>·<code>useBuilds.ts</code> 반복.
+<div class='rec'><b>권장</b> — <code>src/lib/env.ts</code> 단일 모듈에서 타입화 config export.</div></div>
+
+<div class='finding l'><span class='t'><span class='sev l'>Low</span> WEB-21 — nextInstrId 모듈 레벨 가변 카운터</span>
+모듈 수명 동안 단조 증가하는 공유 가변 상태.
+<div class='rec'><b>권장</b> — <code>useRef</code>/<code>crypto.randomUUID()</code> 로 대체.</div></div>
+
+<h2>5. 권장 진행 순서</h2>
+<h3>1순위 — High · 구조적</h3>
+<ul>
+<li>백엔드 <b>공유 모듈 추출</b> — <code>ImageBuildConstants</code>·CR 모델·라벨 키·<code>K8sProperties</code> (SRV-1·2·3·6·CTL-4 동시 해소, drift 차단)</li>
+<li><code>GlobalExceptionHandler</code> catch-all + 원문 미노출 (SRV-4)</li>
+<li>컨트롤러/CR 매핑 <b>테스트 도입</b> (CTL-7·8)</li>
+<li>존재 검사 404 구분 (CTL-1)</li>
+<li>프론트 <b><code>lib/</code> 추출</b> — format·build-phase·dockerfile-content + 에디터 분해 (WEB-1·3·4·7)</li>
+<li>프론트 HTTP 계층 통합 — <code>k8sRequest</code> 제거 (WEB-6)</li>
+</ul>
+<h3>2순위 — Medium</h3>
+<ul>
+<li>백엔드: 예외 변환 헬퍼(SRV-5), <code>getBuildLogs</code> 선형화(SRV-7), SSE 풀 상한(SRV-8), 레지스트리 타입화(SRV-9), <code>VolumeBrowserService</code> 분리(SRV-10), status patch 직렬화/실패 전파(CTL-5), Kaniko 팩토리 추출(CTL-3·2)</li>
+<li>프론트: 빌드 옵션/다이얼로그 통합(WEB-2), <code>&lt;Pagination&gt;</code>/<code>useTableSelection</code>(WEB-8), CR 타입화(WEB-9·10), 매직 상수(WEB-11), 쿼리 키 팩토리(WEB-12), mutation 오류 표준화(WEB-13·14)</li>
+</ul>
+<h3>3순위 — Low</h3>
+<ul>
+<li>백엔드: path 유틸/<code>parseLong</code>(SRV-11), MCP actor(SRV-12), <code>transitionTo</code> 정리(CTL-6), <code>EventRecorder</code> 통일(CTL-9), primitive 프로퍼티(CTL-10)</li>
+<li>프론트: i18n 잔여(WEB-16), 상수 호이스트/포맷(WEB-17·18), dead code(WEB-19), env 모듈(WEB-20), id 카운터(WEB-21), form 전환 가드(WEB-15)</li>
+</ul>
+<blockquote>인가/인증(SRV-13 및 아키텍처 리뷰 A·B 시리즈)은 기존 일정 결정에 따라 베타 기능 완료 후 횡단 관심사로 일괄 진행한다.</blockquote>
+
+<p class='foot'>Dockerizer 코드 리팩토링 리뷰 · 2026-06-11</p>
+</article></div></body></html>

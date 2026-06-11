@@ -141,7 +141,7 @@
 | spec POJO | `cr/ImageBuildSpec` | `imagebuild/cr/ImageBuildSpec` |
 | status POJO | `cr/ImageBuildStatus` | `imagebuild/cr/ImageBuildStatus` |
 | CR 래퍼 | `cr/ImageBuildResource` | `imagebuild/cr/ImageBuildCr` |
-| 라벨 키(`dockerizer.aipub.ten1010.io/...`) | `JobWatcher`/`KanikoJobFactory` 문자열 | `ImageBuildService` 문자열 |
+| 라벨 키(`aipub.ten1010.io/...`) | `JobWatcher`/`KanikoJobFactory` 문자열 | `ImageBuildService` 문자열 |
 
 - 예: 백엔드가 `spec` 에 필드를 추가해도 컨트롤러 POJO 에 미러링하지 않으면 Gson 역직렬화에서 **조용히 누락**된다. 라벨 키 오타도 컴파일에 안 걸린다.
 - 권장: **`imagebuild-api`(또는 `imagebuild-contract`) 공유 Gradle 모듈** 신설 — CR POJO + 상수 + 라벨 키만 담아 양 모듈이 의존. 런타임 디커플링(별도 프로세스)은 유지한 채 **컴파일 타임에 계약을 공유**해 drift 제거. (대안: CRD 에서 모델 생성)

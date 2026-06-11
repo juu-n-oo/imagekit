@@ -351,7 +351,7 @@ flowchart LR
 <li><strong>Dockerizer가 사용하는 라벨</strong>
 <ul>
 <li><em>사용자 입력 → Dockerfile에 기록</em>: <code>title</code>(Dockerfile 이름에서 자동) · <code>version</code>(빈 값이면 <code>latest</code>) · <code>authors</code>(기본=로그인 사용자) · <code>licenses</code> · <code>url</code> · <code>documentation</code> + 임의 커스텀 라벨.</li>
-<li><em>자동 주입 → 빌드 시</em>: <code>created</code> · <code>revision</code> · <code>vendor</code> · <code>base.name</code> · <code>description</code>, 그리고 Dockerizer 고유 출처 라벨(<code>dockerizer.aipub.ten1010.io/dockerfile-id</code>·<code>dockerfile-revision-id</code>·<code>username</code>).</li>
+<li><em>자동 주입 → 빌드 시</em>: <code>created</code> · <code>revision</code> · <code>vendor</code> · <code>base.name</code> · <code>description</code>, 그리고 Dockerizer 고유 출처 라벨(<code>aipub.ten1010.io/dockerfile-id</code>·<code>dockerfile-revision-id</code>·<code>username</code>).</li>
 </ul></li>
 <li>이미지 보안 스캔(취약점·SBOM)은 Dockerizer가 직접 수행하지 않고, 필요 시 AIPub의 Harbor/Trivy 결과를 활용한다.</li>
 </ul>

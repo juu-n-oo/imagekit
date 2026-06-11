@@ -123,13 +123,13 @@ LABEL io.ten1010.aipub.bar="banana"</code></pre>
 <tr><td><code>org.opencontainers.image.vendor</code></td><td>AIPub, TEN Inc</td><td><span class="badge auto">자동 주입</span></td></tr>
 <tr><td><code>org.opencontainers.image.base.name</code></td><td>…/common/ubuntu:latest</td><td><span class="badge auto">자동 주입</span></td></tr>
 <tr><td><code>org.opencontainers.image.description</code></td><td>도커파일 빌드 테스트입니다.</td><td><span class="badge auto">자동 주입</span> <span class="note">Dockerfile 설명</span></td></tr>
-<tr><td><code>dockerizer.aipub.ten1010.io/dockerfile-id</code></td><td>14</td><td><span class="badge auto">자동 주입</span> <span class="note">출처</span></td></tr>
-<tr><td><code>dockerizer.aipub.ten1010.io/dockerfile-revision-id</code></td><td>20</td><td><span class="badge auto">자동 주입</span> <span class="note">출처</span></td></tr>
-<tr><td><code>dockerizer.aipub.ten1010.io/username</code></td><td>joonadmin</td><td><span class="badge auto">자동 주입</span> <span class="note">출처</span></td></tr>
+<tr><td><code>aipub.ten1010.io/dockerfile-id</code></td><td>14</td><td><span class="badge auto">자동 주입</span> <span class="note">출처</span></td></tr>
+<tr><td><code>aipub.ten1010.io/dockerfile-revision-id</code></td><td>20</td><td><span class="badge auto">자동 주입</span> <span class="note">출처</span></td></tr>
+<tr><td><code>aipub.ten1010.io/username</code></td><td>joonadmin</td><td><span class="badge auto">자동 주입</span> <span class="note">출처</span></td></tr>
 </tbody>
 </table></div>
 <blockquote>
-<p><strong>왜 나누나?</strong> 버전·작성자·라이선스처럼 <strong>사람이 정하고 잘 안 바뀌는 값</strong>은 Dockerfile에 남겨 재현·추적이 되게 하고, 생성 시각·리비전처럼 <strong>빌드마다 달라지는 값</strong>은 빌드 시 붙여 Dockerfile을 깔끔하게 유지한다. <code>dockerizer.aipub.ten1010.io/*</code> 출처 라벨 덕분에 <strong>이미지만 보고도</strong> "id 14번 Dockerfile의 20번 리비전을 joonadmin이 빌드"했음을 역추적할 수 있다.</p>
+<p><strong>왜 나누나?</strong> 버전·작성자·라이선스처럼 <strong>사람이 정하고 잘 안 바뀌는 값</strong>은 Dockerfile에 남겨 재현·추적이 되게 하고, 생성 시각·리비전처럼 <strong>빌드마다 달라지는 값</strong>은 빌드 시 붙여 Dockerfile을 깔끔하게 유지한다. <code>aipub.ten1010.io/*</code> 출처 라벨 덕분에 <strong>이미지만 보고도</strong> "id 14번 Dockerfile의 20번 리비전을 joonadmin이 빌드"했음을 역추적할 수 있다.</p>
 </blockquote>
 
 <h2>5. Harbor API 응답 (원본)</h2>
@@ -163,9 +163,9 @@ LABEL io.ten1010.aipub.bar="banana"</code></pre>
         "org.opencontainers.image.vendor": "AIPub, TEN Inc",
         "org.opencontainers.image.base.name": "aipub-harbor.cluster10.idc1.ten1010.io/common/ubuntu:latest",
         "org.opencontainers.image.description": "도커파일 빌드 테스트입니다.",
-        "dockerizer.aipub.ten1010.io/dockerfile-id": "14",
-        "dockerizer.aipub.ten1010.io/dockerfile-revision-id": "20",
-        "dockerizer.aipub.ten1010.io/username": "joonadmin"
+        "aipub.ten1010.io/dockerfile-id": "14",
+        "aipub.ten1010.io/dockerfile-revision-id": "20",
+        "aipub.ten1010.io/username": "joonadmin"
       }
     }
   },
@@ -185,7 +185,7 @@ LABEL io.ten1010.aipub.bar="banana"</code></pre>
 <ul>
 <li>이미지의 <strong>"무엇·왜·누가"</strong>를 알고 싶으면 → Harbor Overview의 <code>Labels</code> 또는 위 API의 <code>config.Labels</code>를 본다.</li>
 <li><strong>사람이 정한 값</strong>(버전·작성자·라이선스·링크·커스텀)은 Dockerfile에도 남아 있으니, 재현·재빌드 시 Dockerfile만으로 동일하게 복원된다.</li>
-<li><strong>출처(provenance)</strong> 추적은 <code>dockerizer.aipub.ten1010.io/*</code> 세 라벨로 한다(어느 Dockerfile·리비전·사용자).</li>
+<li><strong>출처(provenance)</strong> 추적은 <code>aipub.ten1010.io/*</code> 세 라벨로 한다(어느 Dockerfile·리비전·사용자).</li>
 <li>보안 스캔(취약점·SBOM)은 Harbor/Trivy가 별도로 채우며, Dockerizer는 라벨만 책임진다.</li>
 </ul>
 
