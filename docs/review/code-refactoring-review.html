@@ -142,19 +142,19 @@ ul.good li::before{content:"✓";position:absolute;left:.1em;color:var(--green);
 
 <h2>3. ImageBuild 컨트롤러 (<code>imagebuild-controller</code>)</h2>
 
-<div class='finding h'><span class='t'><span class='sev h'>High</span> CTL-1 — configMapExists/jobExists 가 모든 ApiException 을 false 로 삼킴</span>
+<div class='finding h'><span class='t'><span class='sev ok'>완료</span> <span class='sev h'>High</span> CTL-1 — configMapExists/jobExists 가 모든 ApiException 을 false 로 삼킴</span>
 존재 검사가 500/timeout/403 을 깨끗한 404 와 동일하게 "없음" 으로 결론 → create 시도. 보통 409 catch 로 생존하나, <b>비-404 read 오류에 이어 비-409 create 오류가 나면 일시 장애로도 빌드를 <code>markFailed</code></b> 할 수 있다. (아키텍처 리뷰 C-8)
 <div class='rec'><b>권장</b> — 404(→false)/기타(→rethrow, <code>reconcile</code> 가 requeue) 구분. 더 낫게는 사전 검사 제거 + create/409 의존(이미 처리됨)으로 read 왕복·삼킴 동시 제거.</div></div>
 
-<div class='finding m'><span class='t'><span class='sev m'>Medium</span> CTL-2 — handleBuilding 비-404 오류가 requeue 없이 no-op</span>
+<div class='finding m'><span class='t'><span class='sev ok'>완료</span> <span class='sev m'>Medium</span> CTL-2 — handleBuilding 비-404 오류가 requeue 없이 no-op</span>
 Job 읽기 비-404 시 로깅 후 미재시도. resync 로 자가 치유되나 종료 감지 구간 일시 read 실패엔 <code>Result(true)</code> requeue 가 더 정확.
 <div class='rec'><b>권장</b> — 비-404 rethrow(바깥 catch requeue) 또는 명시적 requeue 결과 반환.</div></div>
 
-<div class='finding m'><span class='t'><span class='sev m'>Medium</span> CTL-3 — KanikoJobFactory 의 장황한 명령형 빌더</span>
+<div class='finding m'><span class='t'><span class='sev ok'>완료</span> <span class='sev m'>Medium</span> CTL-3 — KanikoJobFactory 의 장황한 명령형 빌더</span>
 <code>kanikoContainer</code> 가 <code>hasBuildContext</code> 분기를 교차로 엮어 dockerfile 마운트 구성을 중복, <code>createKanikoJob</code> 은 깊게 중첩된 단일 표현식.
 <div class='rec'><b>권장</b> — <code>buildArgs</code>·<code>buildMounts</code>·<code>labelArgs</code> 로 추출(현재 미검증 args 생성을 단위 테스트 가능하게).</div></div>
 
-<div class='finding m'><span class='t'><span class='sev m'>Medium</span> CTL-4 — 팩토리 전반의 매직 문자열</span>
+<div class='finding m'><span class='t'><span class='sev ok'>완료</span> <span class='sev m'>Medium</span> CTL-4 — 팩토리 전반의 매직 문자열</span>
 apiVersion/kind/policy(<code>"v1"</code>,<code>"ConfigMap"</code>,<code>"batch/v1"</code>,<code>"Job"</code>,<code>"Never"</code>,<code>"File"</code>), 마운트 경로(<code>/kaniko-config</code>,<code>/build-context</code>,<code>/workspace</code>,<code>/kaniko/.docker</code>), configmap 키 <code>"Dockerfile"</code>, <code>-job</code>/<code>-dockerfile</code> 접미사가 raw 문자열로 산재.
 <div class='rec'><b>권장</b> — named 상수로 승격(SRV-2/3 공유 모듈과 연계).</div></div>
 
@@ -162,23 +162,23 @@ apiVersion/kind/policy(<code>"v1"</code>,<code>"ConfigMap"</code>,<code>"batch/v
 <code>Map.of("status", gson.fromJson(gson.toJson(status), Map.class))</code> 이중 직렬화. <code>ApiException</code> 시 로깅만 → 호출부는 전환 성공으로 오인, CR 은 이전 phase 에 머물러 resync 때만 재시도(조용한 실패). merge-patch 라 필드 클리어 불가(우연히 동작).
 <div class='rec'><b>권장</b> — 타입 status 직접 patch 직렬화(Map 우회 제거), patch 실패 시 throw 해 requeue 유도, merge-patch 보존 가정 문서화.</div></div>
 
-<div class='finding l'><span class='t'><span class='sev l'>Low</span> CTL-6 — transitionTo 의 도달 불가 terminal 처리</span>
+<div class='finding l'><span class='t'><span class='sev ok'>완료</span> <span class='sev l'>Low</span> CTL-6 — transitionTo 의 도달 불가 terminal 처리</span>
 실제 종료는 전용 <code>markSucceeded</code>/<code>markFailed</code> 로만 구동되어 <code>transitionTo</code> 의 terminal 분기는 사실상 dead.
 <div class='rec'><b>권장</b> — <code>markSucceeded</code>/<code>markFailed</code> 가 단일 <code>applyStatus</code> 에 위임, <code>transitionTo</code> 의 unreachable terminal 처리 제거.</div></div>
 
-<div class='finding h'><span class='t'><span class='sev h'>High</span> CTL-7 — 컨트롤러 모듈 테스트 거의 없음</span>
+<div class='finding h'><span class='t'><span class='sev ok'>완료</span> <span class='sev h'>High</span> CTL-7 — 컨트롤러 모듈 테스트 거의 없음</span>
 <code>src/test</code> 에 컨텍스트 로드 1개뿐. <code>ImageBuildReconciler</code>(phase 머신·409 멱등·digest·timeout 분기), <code>KanikoJobFactory</code>(args/mount/subPath·라벨 정렬), <code>ImageBuildStatusUpdater</code>, <code>enqueueOwner</code> 모두 <b>무테스트</b> — 로직 밀도·회귀 위험 최고.
 <div class='rec'><b>권장</b> — Mockito 로 <code>CoreV1Api</code>/<code>BatchV1Api</code>/<code>CustomObjectsApi</code> 모킹한 reconcile 전환 테스트 + <code>KanikoJobFactory</code>·<code>extractFailureMessage</code>·<code>resolveBuildTimeoutSeconds</code> 순수 단위 테스트.</div></div>
 
-<div class='finding m'><span class='t'><span class='sev m'>Medium</span> CTL-8 — 서버 CR 매핑 경로도 무테스트</span>
+<div class='finding m'><span class='t'><span class='sev ok'>완료</span> <span class='sev m'>Medium</span> CTL-8 — 서버 CR 매핑 경로도 무테스트</span>
 <code>ImageBuildControllerDocsTest</code> 는 service 모킹 REST-docs 테스트라 <code>crMapToResponse</code>/<code>parseStatus</code>/<code>parseSpec</code>/<code>parseInstant</code>/<code>parseLong</code> 에 직접 테스트 없음.
 <div class='rec'><b>권장</b> — status 누락·null 타임스탬프·잘못된 라벨 숫자 등 대표 CR <code>Map</code> 픽스처를 <code>crMapToResponse</code> 에 흘려보내는 단위 테스트.</div></div>
 
-<div class='finding l'><span class='t'><span class='sev l'>Low</span> CTL-9 — EventRecorder 의 core/v1 · events.k8s.io 혼용</span>
+<div class='finding l'><span class='t'><span class='sev ok'>완료</span> <span class='sev l'>Low</span> CTL-9 — EventRecorder 의 core/v1 · events.k8s.io 혼용</span>
 <code>eventTime</code> 와 legacy <code>firstTimestamp</code>/<code>lastTimestamp</code>, <code>source.component</code> 와 <code>reportingComponent</code> 동시 설정 → 동작하나 중복.
 <div class='rec'><b>권장</b> — modern 또는 legacy 한쪽으로 통일.</div></div>
 
-<div class='finding l'><span class='t'><span class='sev l'>Low</span> CTL-10 — boxed Integer/Boolean 언박싱 NPE 표면</span>
+<div class='finding l'><span class='t'><span class='sev ok'>완료</span> <span class='sev l'>Low</span> CTL-10 — boxed Integer/Boolean 언박싱 NPE 표면</span>
 <code>ControllerProperties</code> 가 모두 boxed + 기본값인데 언박싱 사용(<code>resyncPeriodSeconds * 1000L</code> 등). YAML 빈 값 시 null → 시작 NPE.
 <div class='rec'><b>권장</b> — primitive <code>int</code>/<code>boolean</code> 필드 + 기본값(Spring 바인딩 정상).</div></div>
 

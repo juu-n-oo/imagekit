@@ -24,7 +24,7 @@
 
 **가장 효과가 큰 통합 작업** — 백엔드의 `ImageBuildConstants`·CR 모델(`ImageBuildSpec`/`ImageBuildStatus`)·라벨 키·`K8sProperties` 를 **공유 Gradle 모듈**로 추출하면 SRV-1·SRV-2·SRV-3·SRV-6·CTL-4 의 상당 부분이 한 번에 해소된다(이미 drift 발생 — 컨트롤러의 `ImageBuildSpec` 에는 `imageLabels` 가 있으나 서버 쪽엔 없음). 프론트는 `src/lib/`(format·build-phase·dockerfile-content) + `<Pagination>`/`useTableSelection` 추출이 동급의 효과를 낸다.
 
-> 구현 현황(2026-06-11): SRV-4·5·6·7·8·9·13·WEB-19 완료, SRV-3·12 부분완료. 별도 작업으로 라벨/CRD group 을 `aipub.ten1010.io` 로 이관(SRV-2 의 '상수 단일화'와는 무관 — 라벨 정의는 여전히 백/컨트롤러/프론트 3곳, prefix 만 변경됨).
+> 구현 현황(2026-06-11): SRV-4·5·6·7·8·9·13·WEB-19, **CTL-1·2·3·4·6·7·8·9·10** 완료, SRV-3·12 부분완료. CTL-5(status patch Gson 왕복·실패 전파)는 이번 범위 외로 미해소. 별도 작업으로 라벨/CRD group 을 `aipub.ten1010.io` 로 이관(SRV-2 의 '상수 단일화'와는 무관 — 라벨 정의는 여전히 백/컨트롤러/프론트 3곳, prefix 만 변경됨).
 
 ---
 
@@ -109,19 +109,23 @@
 
 ## 3. ImageBuild 컨트롤러 (`imagebuild-controller`)
 
-### CTL-1 — `configMapExists`/`jobExists` 가 모든 `ApiException` 을 `false` 로 삼킴 · **High** (아키텍처 리뷰의 C-8)
+### CTL-1 — `configMapExists`/`jobExists` 가 모든 `ApiException` 을 `false` 로 삼킴 · **High** (아키텍처 리뷰의 C-8) · ✅ 완료
+> ✅ **완료(2026-06-11)**: 사전 존재 검사(`configMapExists`/`jobExists`)를 제거하고 create + 409-already-exists 멱등 처리에만 의존하도록 변경 — 비-404 read 를 "없음" 으로 삼키던 false-negative 를 제거.
 `ImageBuildReconciler` 의 존재 검사가 500/timeout/403 을 깨끗한 404 와 동일하게 "없음" 으로 결론 → create 시도. create 는 409 catch 로 멱등성을 유지하지만, **비-404 read 오류에 이어 비-409 create 오류가 나면 일시적 API 장애로도 빌드를 `markFailed`** 할 수 있다.
 **권장** — 404(→false)와 기타 코드(→rethrow, `reconcile` 의 `catch(RuntimeException)` 가 requeue)를 구분. 더 낫게는 사전 검사를 제거하고 create + 409-already-exists 에만 의존(이미 409 처리됨)해 read 왕복과 삼킴을 함께 제거.
 
-### CTL-2 — `handleBuilding` 의 비-404 오류가 requeue 없이 no-op · **Medium**
+### CTL-2 — `handleBuilding` 의 비-404 오류가 requeue 없이 no-op · **Medium** · ✅ 완료
+> ✅ **완료(2026-06-11)**: 종료 감지 구간의 비-404 read 오류를 `RuntimeException` 으로 rethrow → `reconcile` 의 `catch` 가 `Result(true)` 로 requeue.
 Job 읽기에서 비-404 `ApiException` 시 로깅 후 `Result(false)`(요청 미재시도). resync 로 자가 치유되나, 종료 감지 구간의 일시 read 실패엔 `Result(true)` requeue 가 더 정확.
 **권장** — 비-404 를 rethrow(바깥 catch 가 requeue) 하거나 명시적 requeue 결과 반환.
 
-### CTL-3 — `KanikoJobFactory` 의 장황한 명령형 빌더 · **Medium**
+### CTL-3 — `KanikoJobFactory` 의 장황한 명령형 빌더 · **Medium** · ✅ 완료
+> ✅ **완료(2026-06-11)**: `kanikoContainer` 를 `buildArgs`/`buildMounts`/`labelArgs` (package-private) 로 분해 — 분기 중복 제거 + `KanikoJobFactoryTest` 로 args/mount/라벨 정렬 단위 검증.
 `kanikoContainer` 가 `hasBuildContext` true/false 분기를 교차로 엮어 각자 `--dockerfile`/`--context` + 마운트를 추가한 뒤 공통 args/mounts 를 붙임 → 두 분기가 dockerfile 마운트 구성을 중복. `createKanikoJob` 은 깊게 중첩된 단일 표현식.
 **권장** — `buildArgs(cr, hasContext)`·`buildMounts(cr, hasContext)`·`labelArgs(imageLabels)` 로 추출(현재 미검증인 args 생성을 단위 테스트 가능하게).
 
-### CTL-4 — 팩토리 전반의 매직 문자열 · **Medium/Low**
+### CTL-4 — 팩토리 전반의 매직 문자열 · **Medium/Low** · ✅ 완료
+> ✅ **완료(2026-06-11)**: apiVersion/kind/policy·마운트 경로·configmap 키·접미사 리터럴을 `KanikoJobFactory` 의 named 상수로 승격(공유 모듈 추출은 SRV-3 와 함께 향후).
 apiVersion/kind/policy 리터럴(`"v1"`,`"ConfigMap"`,`"batch/v1"`,`"Job"`,`"Never"`,`"File"`), 마운트 경로(`/kaniko-config`,`/build-context`,`/workspace`,`/kaniko/.docker`), configmap 키 `"Dockerfile"`, `-job`/`-dockerfile` 접미사가 raw 문자열로 산재.
 **권장** — 마운트 경로·kind/apiVersion 리터럴을 named 상수로 승격(SRV-2/3 공유 모듈과 연계).
 
@@ -129,23 +133,28 @@ apiVersion/kind/policy 리터럴(`"v1"`,`"ConfigMap"`,`"batch/v1"`,`"Job"`,`"Nev
 `Map.of("status", gson.fromJson(gson.toJson(status), Map.class))` 로 status→JSON→Map→JSON(SRV-1 과 동일 이중 직렬화). `ApiException` 시 로깅만 하고 반환 → 호출부(`reconcile`)는 전환 성공으로 오인, CR 은 이전 phase 에 머물러 resync 때만 재시도(조용한 실패). merge-patch 라 필드 클리어 불가(`startTime` 보존이 우연히 동작).
 **권장** — 타입 status 를 직접 patch 로 직렬화(Map 우회 제거), patch 실패 시 throw 해 requeue 유도, merge-patch 필드 보존 가정을 문서화.
 
-### CTL-6 — `transitionTo` 의 도달 불가 terminal 처리 · **Low**
+### CTL-6 — `transitionTo` 의 도달 불가 terminal 처리 · **Low** · ✅ 완료
+> ✅ **완료(2026-06-11)**: `transitionTo` 의 도달 불가 terminal(`completionTime`) 분기 제거, `transitionTo`/`markSucceeded`/`markFailed` 가 단일 private `applyStatus` 로 status 쓰기를 위임. (patchStatus 의 Gson 왕복·실패 전파는 CTL-5 — 이번 범위 외)
 `transitionTo` 가 terminal phase 의 `completionTime` 분기를 갖지만 실제 종료는 전용 `markSucceeded`/`markFailed` 로만 구동되어 해당 분기는 사실상 dead.
 **권장** — `markSucceeded`/`markFailed` 가 단일 private `applyStatus` 에 위임하게 하고 `transitionTo` 의 unreachable terminal 처리 제거.
 
-### CTL-7 — 컨트롤러 모듈 테스트 거의 없음 · **High**
+### CTL-7 — 컨트롤러 모듈 테스트 거의 없음 · **High** · ✅ 완료
+> ✅ **완료(2026-06-11)**: `ImageBuildReconcilerTest`(Mockito 로 reconcile phase 전환·CTL-1 409 멱등·CTL-2 requeue·404 markFailed·digest 추출·`extractFailureMessage`) + `KanikoJobFactoryTest`(args/mount/volume·subPath·라벨 정렬·timeout 해석) 추가. (`ImageBuildStatusUpdater`/`enqueueOwner` 는 후속)
 `src/test` 에 컨텍스트 로드 테스트 1개뿐. `ImageBuildReconciler`(phase 상태머신·409 멱등·digest 추출·timeout 메시지 분기), `KanikoJobFactory`(args/mount/volume 조립·subPath·라벨 정렬), `ImageBuildStatusUpdater`, `enqueueOwner` 모두 **무테스트** — 가장 로직 밀도가 높고 회귀 위험이 큰 코드.
 **권장** — Mockito 로 `CoreV1Api`/`BatchV1Api`/`CustomObjectsApi` 모킹해 reconcile 전환 테스트, `KanikoJobFactory`·`extractFailureMessage`·`resolveBuildTimeoutSeconds` 는 k8s 불필요한 순수 단위 테스트.
 
-### CTL-8 — 서버 CR 매핑 경로도 무테스트 · **Medium**
+### CTL-8 — 서버 CR 매핑 경로도 무테스트 · **Medium** · ✅ 완료
+> ✅ **완료(2026-06-11)**: 매핑 로직을 `ImageBuildService` 에서 `ImageBuildCrMapper` (정적·k8s 무관)로 추출하고 `ImageBuildCrMapperTest` 추가 — full CR / status 누락 / 라벨·어노테이션 누락 / 비숫자 라벨 / 깨진 타임스탬프 픽스처 검증.
 `ImageBuildControllerDocsTest` 는 service 를 모킹한 REST-docs 테스트라 `crMapToResponse`/`parseStatus`/`parseSpec`/`parseInstant`/`parseLong`(가장 위험한 로직)에 직접 테스트가 없다.
 **권장** — status 누락·null 타임스탬프·잘못된 라벨 숫자 등 대표 CR `Map` 픽스처를 `crMapToResponse` 에 흘려보내는 단위 테스트 추가.
 
-### CTL-9 — `EventRecorder` 의 core/v1 · events.k8s.io 관례 혼용 · **Low**
+### CTL-9 — `EventRecorder` 의 core/v1 · events.k8s.io 관례 혼용 · **Low** · ✅ 완료
+> ✅ **완료(2026-06-11)**: modern 관례로 통일 — `eventTime`+`reportingComponent`/`reportingInstance`+`action` 유지, legacy `firstTimestamp`/`lastTimestamp`·`source.component` 제거.
 `eventTime` 와 legacy `firstTimestamp`/`lastTimestamp`, `source.component` 와 신규 `reportingComponent` 를 동시 설정 → 동작은 하나 중복.
 **권장** — modern(`eventTime`+`reportingController`) 또는 legacy 한쪽으로 통일.
 
-### CTL-10 — boxed `Integer`/`Boolean` 프로퍼티 언박싱 NPE 표면 · **Low**
+### CTL-10 — boxed `Integer`/`Boolean` 프로퍼티 언박싱 NPE 표면 · **Low** · ✅ 완료
+> ✅ **완료(2026-06-11)**: `ControllerProperties` 의 `jobTtlSeconds`/`buildTimeoutSeconds`/`resyncPeriodSeconds`/`workerCount` → `int`, `registryInsecure`/`registrySkipTlsVerify` → `boolean` 로 변경(언박싱 NPE 표면 제거, getter 는 `isRegistryInsecure()` 등으로 갱신).
 `ControllerProperties` 가 모두 boxed + 기본값인데 언박싱 사용(`resyncPeriodSeconds * 1000L` 등). YAML 에서 빈 값을 주면 null → 시작 시 NPE.
 **권장** — primitive `int`/`boolean` 필드 + 기본값(Spring 바인딩 정상)으로 언박싱 NPE 표면 제거.
 
