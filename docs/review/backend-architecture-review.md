@@ -100,13 +100,15 @@
 - **구현 (activeDeadlineSeconds만)**: Job 에 `activeDeadlineSeconds` 부여. 기본값 `ControllerProperties.buildTimeoutSeconds=3600`(60분), CR `spec.buildTimeoutSeconds`(CRD 추가) 로 빌드별 override — 프론트 빌드 다이얼로그에서 **분 단위 입력 → 초 변환**해 CR 에 전달. `activeDeadlineSeconds` 는 wall-clock 상한일 뿐 "느린 빌드 vs 멈춘 빌드" 를 구분하지 못하므로, ① 정상 빌드는 닿지 않을 관대한 기본값 + 사용자 조정, ② 실패 사유가 `DeadlineExceeded` 면 빌드 에러와 구분해 "제한 시간(N분) 초과" 메시지로 표출(`ImageBuildReconciler.extractFailureMessage`)하는 방식으로 보완.
 - **미구현 (잔여)**: Kaniko 컨테이너 **resources requests/limits** 는 아직 없음 — 메모리 폭주 보호는 별도 작업으로 남음.
 
-#### C-6 🟡 `imageDigest` 가 항상 null
+#### C-6 🟡 `imageDigest` 가 항상 null — ✅ 구현 완료 (2026-06-11)
 `handleBuilding` 이 성공 시 `statusUpdater.markSucceeded(cr, null)` 로 **digest 를 항상 null** 로 기록한다. CRD·응답 DTO 에 `imageDigest` 필드가 있으나 채워지지 않는다.
 - 권장: Kaniko `--digest-file=/dev/termination-log`(또는 파일) 출력을 Pod 에서 읽어 digest 를 status 에 채우기. 또는 digest 미지원을 명시적으로 문서화.
+- **구현**: Kaniko 에 `--digest-file=/dev/termination-log` 추가(`KanikoJobFactory`, 컨테이너 `terminationMessagePath/Policy` 명시). `handleBuilding` 성공 시 빌드 Pod 의 kaniko 컨테이너 `terminated.message` 에서 digest 를 읽어(`readImageDigest`) `markSucceeded(cr, digest)` 로 기록. 미취득(Pod GC/빈 값/오류) 시 null 로 graceful — 빌드 성공은 유지.
 
-#### C-7 🟡 `--insecure` / `--skip-tls-verify` 하드코딩
+#### C-7 🟡 `--insecure` / `--skip-tls-verify` 하드코딩 — ✅ 구현 완료 (2026-06-11)
 모든 빌드가 무조건 insecure registry + TLS 검증 skip 으로 push 한다(`kanikoContainer`). 내부 Harbor(self-signed) 대상이라 의도된 것이나, **대상 레지스트리를 선택할 수 없고** 보안 옵션이 코드에 고정되어 있다.
 - 권장: `ControllerProperties`/CR spec 으로 토글화(기본은 현행 유지).
+- **구현**: `ControllerProperties.registryInsecure`/`registrySkipTlsVerify`(둘 다 기본 true=현행 유지) 토글 추가. `kanikoContainer` 가 토글 값에 따라 `--insecure`/`--skip-tls-verify` 를 조건부로 부여. (대상 레지스트리 선택은 별도 범위로 유지.)
 
 #### C-8 ⚪ 기타
 - `configMapExists`/`jobExists` 가 **모든 `ApiException` 을 false 로 간주**(500/403 도 "없음" 처리) → 진짜 오류를 생성 시도로 흘림. 404 만 false 로 좁히는 게 안전.
@@ -114,7 +116,7 @@
 - 각 컴포넌트가 `new Gson()` 개별 생성 — 공유 bean 으로 모아도 됨(사소).
 - CRD `status.phase default: Pending` 은 status 서브리소스 특성상 생성 시 적용 안 될 수 있음(코드의 `currentPhase` 가 null→Pending 으로 보정하므로 무해).
 
-#### C-9 🟠 빌드 ConfigMap 수명이 CR 수명에 묶여 무한 누적
+#### C-9 🟠 빌드 ConfigMap 수명이 CR 수명에 묶여 무한 누적 — ✅ 구현 완료 (2026-06-11, 권장안 A)
 빌드마다 `<cr>-dockerfile` ConfigMap(Dockerfile 본문 보관)을 만드는데(`ImageBuildReconciler.java:54-76`, `KanikoJobFactory.java:28-37`), 이 CM 의 `ownerReference` 가 **ImageBuild CR** 로 설정되어 있어(`KanikoJobFactory.java:36`) **CR 이 삭제될 때만** GC 된다. 코드 어디에도 `deleteNamespacedConfigMap` 호출이 없다. 따라서 **빌드 이력을 위해 CR 을 보존하면 CM 도 빌드 1건당 1개씩 영구 누적**된다.
 
 - 비대칭 주의: Kaniko **Job/Pod 는 `jobTtlSeconds=3600`(1h) TTL 로 자동 GC** 되어 bounded 인 반면, **CR·CM 은 retention 정책이 없어 unbounded** 다. (`--max-pods`(노드당 110)는 *동시 실행* Pod 한도일 뿐 누적과 무관 — 진짜 누적 주체는 CR/CM.)
@@ -123,6 +125,7 @@
   - (A, 권장) terminal phase 진입(`markSucceeded`/`markFailed`) 직후 `deleteNamespacedConfigMap(<cr>-dockerfile)` 호출 — CR 은 이력 보존, CM 만 폐기. 재빌드 시 `configMapExists` 체크로 재생성됨.
   - (B) CM `ownerReference` 를 CR → Job 으로 변경하여 Job TTL 때 함께 GC(코드 변경 최소이나 재빌드 시 owner 꼬임 주의).
 - 더불어 CR 자체를 무한 보관할 계획이면 별도 retention(Dockerfile 당 최근 N개 등)·백엔드 LIST 페이지네이션을 함께 검토.
+- **구현 (권장안 A)**: `ImageBuildReconciler.deleteDockerfileConfigMap` 추가, terminal 전이 시 1회 호출 — `handleBuilding` 의 성공/실패, `handlePending`/`handlePreparing` 의 `markFailed` 직후. 404(이미 없음)는 무시. terminal-case 반복 삭제가 아닌 전이 시점 1회라 resync 마다 API 호출이 늘지 않음. CR retention·LIST 페이지네이션은 잔여 검토 항목으로 유지.
 
 ### 2.3 백엔드와의 의존성 최소화 평가
 
@@ -285,11 +288,11 @@ NGC/HuggingFace 검색은 **외부 인터넷 호출**이다(`nvcr.io`, catalog A
 | 6 | **A-5** 인증 결과 캐싱 | 🟠 | 성능/가용성 | 소 |
 | 7 | **A-6/A-7** SSE 스레드풀 경계화 · exec 타임아웃 | 🟡 | 안정성 | 소~중 |
 | 8 | **C-5** Kaniko activeDeadlineSeconds·resources — 🟢 activeDeadlineSeconds 완료(2026-06-11), **resources 잔여** | 🟡 | 안정성 | 소 |
-| 8.5 | **C-9** 빌드 CM 을 terminal phase 에서 삭제(수명 분리) | 🟠 | 안정성/자원 | 소 |
+| ~~8.5~~ | ~~**C-9** 빌드 CM 을 terminal phase 에서 삭제(수명 분리)~~ ✅ 완료(2026-06-11, 권장안 A) | 🟠 | 안정성/자원 | 소 |
 | 9 | **A-8/A-9** actuator 노출 축소 · 업로드 쿼터 | 🟡 | 보안/안정성 | 소 |
-| 10 | **C-6** imageDigest 채우기 | 🟡 | 기능완결 | 중 |
+| ~~10~~ | ~~**C-6** imageDigest 채우기~~ ✅ 완료(2026-06-11) | 🟡 | 기능완결 | 중 |
 | 11 | **§2.3 / B-4** CR 계약 공유 모듈화 | 🟡 | 유지보수 | 중 |
-| 12 | A-10/A-11/A-12/~~C-4~~/C-7/C-8/B-6/B-7 마무리 (C-4 ✅ 완료) | ⚪ | 개선 | 소 |
+| 12 | A-10/A-11/A-12/~~C-4~~/~~C-7~~/C-8/B-6/B-7 마무리 (C-4·C-7 ✅ 완료) | ⚪ | 개선 | 소 |
 | **마지막** | **기본 인증/인가 일괄 정비: A-1, B-1, A-3, B-5, A-2** (selfsubjectreview 역할 구분은 현행 유지) | 🔴🟠 | 보안 | 중~대 |
 
 ---
