@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Dockerizer — Dockerfile 리비전 버저닝</title><link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css'><style>
+<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>ImageKit — Dockerfile 리비전 버저닝</title><link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css'><style>
 :root{--accent:#1d63ed;--accent2:#16b1ff;--accent-soft:#e9f0fe;--ink:#161d2b;--muted:#5d6878;
 --border:#e4e8ef;--bg:#eceff5;--green:#0f7a50;--green-soft:#e6f6ee;--amber:#9a5a08;--red:#d43b3b;}
 *{box-sizing:border-box;}html{scroll-behavior:smooth;}
@@ -35,7 +35,7 @@ tbody tr:last-child td{border-bottom:none;}tbody tr:hover td{background:#f8faff;
 </style></head><body>
 <div class="wrap"><div class="card">
 
-<p class="eyebrow">Dockerizer Architecture</p>
+<p class="eyebrow">ImageKit Architecture</p>
 <h1>Dockerfile 리비전 버저닝</h1>
 <p>Dockerfile의 변경 이력을 Git commit 모델과 유사하게 관리하는 메커니즘. 매 저장마다 새 리비전이 append-only로 생성되며, 이전 버전 조회/비교/롤백이 가능하다.</p>
 <p><strong>최종 갱신:</strong> 2026-06-04</p>
@@ -82,7 +82,7 @@ tbody tr:last-child td{border-bottom:none;}tbody tr:hover td{background:#f8faff;
 </ul>
 
 <h3>2.3 마이그레이션</h3>
-<p><code>sql/Dockerizer_1.2.0__add_revision_versioning.sql</code></p>
+<p><code>sql/ImageKit_1.2.0__add_revision_versioning.sql</code></p>
 <ul>
 <li><code>dockerfile_revisions</code> 테이블 생성</li>
 <li><code>dockerfiles.latest_revision_id</code> 컬럼 추가</li>
@@ -269,7 +269,7 @@ tbody tr:last-child td{border-bottom:none;}tbody tr:hover td{background:#f8faff;
 <div class="tablewrap"><table>
 <thead><tr><th>역할</th><th>파일</th></tr></thead>
 <tbody>
-<tr><td>DB 마이그레이션</td><td><code>sql/Dockerizer_1.2.0__add_revision_versioning.sql</code></td></tr>
+<tr><td>DB 마이그레이션</td><td><code>sql/ImageKit_1.2.0__add_revision_versioning.sql</code></td></tr>
 <tr><td>리비전 엔티티</td><td><code>dockerfile/entity/DockerfileRevision.java</code></td></tr>
 <tr><td>Dockerfile 엔티티 (latestRevision)</td><td><code>dockerfile/entity/Dockerfile.java</code></td></tr>
 <tr><td>리비전 리포지토리</td><td><code>dockerfile/repository/DockerfileRevisionRepository.java</code></td></tr>
@@ -331,7 +331,7 @@ tbody tr:last-child td{border-bottom:none;}tbody tr:hover td{background:#f8faff;
 </table></div>
 
 <hr>
-<p style="font-size:.85rem;color:var(--muted);text-align:center;">Dockerizer — Dockerfile Revision Versioning &copy; AIPub, TEN Inc.</p>
+<p style="font-size:.85rem;color:var(--muted);text-align:center;">ImageKit — Dockerfile Revision Versioning &copy; AIPub, TEN Inc.</p>
 
 </div></div>
 </body></html>

@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Dockerizer 백엔드 코드 구조 분석</title><link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css'><style>
+<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>ImageKit 백엔드 코드 구조 분석</title><link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css'><style>
 :root{--accent:#1d63ed;--accent2:#16b1ff;--accent-soft:#e9f0fe;--ink:#161d2b;--muted:#5d6878;
 --border:#e4e8ef;--bg:#eceff5;--green:#0f7a50;--green-soft:#e6f6ee;--amber:#9a5a08;}
 *{box-sizing:border-box;}
@@ -44,11 +44,11 @@ ul.good li::before{content:"✓";position:absolute;left:.1em;color:var(--green);
 @media print{body{background:#fff;font-size:11pt;}.wrap{padding:0;max-width:none;}.card{border:none;box-shadow:none;border-radius:0;padding:0;}.card::before{display:none;}a{border:none;}}
 </style></head><body><div class='wrap'><article class='card'>
 <div class='eyebrow'>Code Review</div>
-<h1>Dockerizer 백엔드 코드 구조 분석</h1>
+<h1>ImageKit 백엔드 코드 구조 분석</h1>
 <table class='meta'><tbody>
 <tr><th>작성일</th><td>2026-06-11</td></tr>
 <tr><th>대상</th><td><code>main</code> (07621fe 기준)</td></tr>
-<tr><th>범위</th><td><code>imagebuild-controller</code> (k8s 오퍼레이터) · <code>dockerizer-backend-server</code> (REST 백엔드)</td></tr>
+<tr><th>범위</th><td><code>imagebuild-controller</code> (k8s 오퍼레이터) · <code>imagekit-backend-server</code> (REST 백엔드)</td></tr>
 <tr><th>원본</th><td><a href='backend-architecture-review.md'>backend-architecture-review.md</a> (동일 내용)</td></tr>
 </tbody></table>
 
@@ -72,7 +72,7 @@ ul.good li::before{content:"✓";position:absolute;left:.1em;color:var(--green);
 <blockquote><b>인가 결론 / 일정 결정</b> — Dockerfile <i>목록</i> 조회만 엄격히 인가되고, <b>나머지 거의 모든 경로(ImageBuild 전체, Dockerfile 단건/삭제, Volume 전체, 미인증 MCP)는 프로젝트 격리가 사실상 없다.</b> 단, <b><code>selfsubjectreview</code> 로 사용자/관리자를 구분하는 현행 메커니즘</b>(<code>AipubAuthenticationFilter</code> → roles, <code>DockerfileController.isAdmin</code>)은 유지한다. 그 외 <b>기본 인증/인가 정비(A-1·B-1·A-3·B-5·A-2)는 베타 기능 개발을 마친 뒤 가장 마지막에 횡단 관심사로 일괄 진행</b>한다(프로젝트 결정). 심각도는 높으나 일정상 후순위이며, 그 사이 MCP·Volume 등은 <b>네트워크 레벨(내부 전용 노출)로만 보호</b>됨을 전제한다.</blockquote>
 
 <h2>1. 아키텍처 개요</h2>
-<pre><code>[브라우저] ──REST──> [dockerizer-backend-server]
+<pre><code>[브라우저] ──REST──> [imagekit-backend-server]
                           │  (1) Dockerfile CRUD → PostgreSQL
                           │  (2) 빌드 트리거: ImageBuild CR 생성
                           ▼
@@ -298,5 +298,5 @@ NGC/HuggingFace 검색은 외부 인터넷 호출이다(<code>required=false</co
 <tr><td><b>마지막</b></td><td><b>기본 인증/인가 일괄 정비: A-1, B-1, A-3, B-5, A-2</b> (selfsubjectreview 역할 구분은 현행 유지)</td><td><span class='sev c'>Critical</span><span class='sev h'>High</span></td><td>보안</td><td>중~대</td></tr>
 </tbody></table></div>
 
-<div class='foot'>Dockerizer 백엔드 코드 구조 분석 · 2026-06-11 · 동일 내용 Markdown: <a href='backend-architecture-review.md'>backend-architecture-review.md</a></div>
+<div class='foot'>ImageKit 백엔드 코드 구조 분석 · 2026-06-11 · 동일 내용 Markdown: <a href='backend-architecture-review.md'>backend-architecture-review.md</a></div>
 </article></div></body></html>

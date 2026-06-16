@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>이미지 메타데이터 라벨 — 실제 빌드 예시 (Dockerizer)</title><link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css'><style>
+<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>이미지 메타데이터 라벨 — 실제 빌드 예시 (ImageKit)</title><link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css'><style>
 :root{--accent:#1d63ed;--accent2:#16b1ff;--accent-soft:#e9f0fe;--ink:#161d2b;--muted:#5d6878;
 --border:#e4e8ef;--bg:#eceff5;--green:#0f7a50;--green-soft:#e6f6ee;--amber:#9a5a08;}
 *{box-sizing:border-box;}html{scroll-behavior:smooth;}
@@ -53,7 +53,7 @@ details .inner{padding:0 18px 6px;}
 @media(max-width:640px){.card{padding:30px 20px;border-radius:14px;}h1{font-size:1.55rem;}.wrap{padding:28px 14px 80px;}}
 @media print{body{background:#fff;font-size:11pt;}.wrap{padding:0;max-width:none;}.card{border:none;box-shadow:none;border-radius:0;padding:0;}.card::before{display:none;}.tablewrap{overflow:visible;}a{border:none;}details{border:none;}details>summary{display:none;}}
 </style></head><body><div class='wrap'><article class='card'>
-<div class='eyebrow'>Worked Example · Dockerizer PRD 10절 보조 문서</div>
+<div class='eyebrow'>Worked Example · ImageKit PRD 10절 보조 문서</div>
 <h1>이미지 메타데이터 라벨 — 실제 빌드 예시</h1>
 <blockquote>
 <p>PRD <strong>10절 "이미지 메타데이터 라벨(OCI 표준)"</strong>이 실제 빌드에서 어떻게 나타나는지, 한 건의 빌드 결과(<code>sse-qa/dockerfile-build-test:0.1.0</code>)로 입력 → Dockerfile → Harbor 이미지 라벨까지 따라가며 보여준다.</p>
@@ -77,8 +77,8 @@ details .inner{padding:0 18px 6px;}
 <tr><td>Version</td><td><code>0.1.0</code></td></tr>
 <tr><td>Authors</td><td><code>joonadmin</code> (기본값 = 로그인 사용자)</td></tr>
 <tr><td>License</td><td><code>MIT</code></td></tr>
-<tr><td>URL</td><td><code>https://github.com/ten1010-io/dockerizer</code></td></tr>
-<tr><td>Documentation</td><td><code>https://github.com/ten1010-io/dockerizer/docs</code></td></tr>
+<tr><td>URL</td><td><code>https://github.com/ten1010-io/imagekit</code></td></tr>
+<tr><td>Documentation</td><td><code>https://github.com/ten1010-io/imagekit/docs</code></td></tr>
 <tr><td>커스텀 라벨</td><td><code>io.ten1010.aipub.foo = apple</code> · <code>io.ten1010.aipub.bar = banana</code></td></tr>
 </tbody>
 </table></div>
@@ -93,8 +93,8 @@ LABEL org.opencontainers.image.title="dockerfile-build-test"
 LABEL org.opencontainers.image.version="0.1.0"
 LABEL org.opencontainers.image.authors="joonadmin"
 LABEL org.opencontainers.image.licenses="MIT"
-LABEL org.opencontainers.image.url="https://github.com/ten1010-io/dockerizer"
-LABEL org.opencontainers.image.documentation="https://github.com/ten1010-io/dockerizer/docs"
+LABEL org.opencontainers.image.url="https://github.com/ten1010-io/imagekit"
+LABEL org.opencontainers.image.documentation="https://github.com/ten1010-io/imagekit/docs"
 LABEL io.ten1010.aipub.foo="apple"
 LABEL io.ten1010.aipub.bar="banana"</code></pre>
 
@@ -105,7 +105,7 @@ LABEL io.ten1010.aipub.bar="banana"</code></pre>
 <p>같은 화면에 섞여 보이는 16개 라벨이 각각 어디서 왔는지가 핵심이다. 둘로 나뉜다.</p>
 <div class="legend">
 <span><span class="badge user">사용자 입력</span> 에디터에서 입력 → <strong>Dockerfile <code>LABEL</code></strong>로 기록(이미지·Dockerfile 양쪽에 보존)</span>
-<span><span class="badge auto">자동 주입</span> 빌드 시 Dockerizer가 채움 → <strong>빌드 옵션</strong>으로 부착(Dockerfile에는 없음)</span>
+<span><span class="badge auto">자동 주입</span> 빌드 시 ImageKit가 채움 → <strong>빌드 옵션</strong>으로 부착(Dockerfile에는 없음)</span>
 </div>
 <div class="tablewrap"><table>
 <thead><tr><th>라벨 키</th><th>값</th><th>출처</th></tr></thead>
@@ -114,8 +114,8 @@ LABEL io.ten1010.aipub.bar="banana"</code></pre>
 <tr><td><code>org.opencontainers.image.version</code></td><td>0.1.0</td><td><span class="badge user">사용자 입력</span></td></tr>
 <tr><td><code>org.opencontainers.image.authors</code></td><td>joonadmin</td><td><span class="badge user">사용자 입력</span></td></tr>
 <tr><td><code>org.opencontainers.image.licenses</code></td><td>MIT</td><td><span class="badge user">사용자 입력</span></td></tr>
-<tr><td><code>org.opencontainers.image.url</code></td><td>https://github.com/ten1010-io/dockerizer</td><td><span class="badge user">사용자 입력</span></td></tr>
-<tr><td><code>org.opencontainers.image.documentation</code></td><td>https://github.com/ten1010-io/dockerizer/docs</td><td><span class="badge user">사용자 입력</span></td></tr>
+<tr><td><code>org.opencontainers.image.url</code></td><td>https://github.com/ten1010-io/imagekit</td><td><span class="badge user">사용자 입력</span></td></tr>
+<tr><td><code>org.opencontainers.image.documentation</code></td><td>https://github.com/ten1010-io/imagekit/docs</td><td><span class="badge user">사용자 입력</span></td></tr>
 <tr><td><code>io.ten1010.aipub.foo</code></td><td>apple</td><td><span class="badge user">사용자 입력</span> <span class="note">커스텀 라벨</span></td></tr>
 <tr><td><code>io.ten1010.aipub.bar</code></td><td>banana</td><td><span class="badge user">사용자 입력</span> <span class="note">커스텀 라벨</span></td></tr>
 <tr><td><code>org.opencontainers.image.created</code></td><td>2026-06-10T06:37:30.936Z</td><td><span class="badge auto">자동 주입</span></td></tr>
@@ -133,7 +133,7 @@ LABEL io.ten1010.aipub.bar="banana"</code></pre>
 </blockquote>
 
 <h2>5. Harbor API 응답 (원본)</h2>
-<p class="note">조회: <code>GET /api/v2.0/projects/sse-qa/repositories/dockerfile-build-test/artifacts</code> — <code>extra_attrs.config.Labels</code>에 위 라벨이 그대로 담긴다. SBOM·취약점은 별도 링크(<code>addition_links</code>)로 Harbor가 제공한다(Dockerizer가 만들지 않음).</p>
+<p class="note">조회: <code>GET /api/v2.0/projects/sse-qa/repositories/dockerfile-build-test/artifacts</code> — <code>extra_attrs.config.Labels</code>에 위 라벨이 그대로 담긴다. SBOM·취약점은 별도 링크(<code>addition_links</code>)로 Harbor가 제공한다(ImageKit가 만들지 않음).</p>
 <details>
 <summary>응답 JSON 펼치기</summary>
 <div class="inner">
@@ -154,8 +154,8 @@ LABEL io.ten1010.aipub.bar="banana"</code></pre>
         "org.opencontainers.image.version": "0.1.0",
         "org.opencontainers.image.authors": "joonadmin",
         "org.opencontainers.image.licenses": "MIT",
-        "org.opencontainers.image.url": "https://github.com/ten1010-io/dockerizer",
-        "org.opencontainers.image.documentation": "https://github.com/ten1010-io/dockerizer/docs",
+        "org.opencontainers.image.url": "https://github.com/ten1010-io/imagekit",
+        "org.opencontainers.image.documentation": "https://github.com/ten1010-io/imagekit/docs",
         "io.ten1010.aipub.foo": "apple",
         "io.ten1010.aipub.bar": "banana",
         "org.opencontainers.image.created": "2026-06-10T06:37:30.936Z",
@@ -186,9 +186,9 @@ LABEL io.ten1010.aipub.bar="banana"</code></pre>
 <li>이미지의 <strong>"무엇·왜·누가"</strong>를 알고 싶으면 → Harbor Overview의 <code>Labels</code> 또는 위 API의 <code>config.Labels</code>를 본다.</li>
 <li><strong>사람이 정한 값</strong>(버전·작성자·라이선스·링크·커스텀)은 Dockerfile에도 남아 있으니, 재현·재빌드 시 Dockerfile만으로 동일하게 복원된다.</li>
 <li><strong>출처(provenance)</strong> 추적은 <code>aipub.ten1010.io/*</code> 세 라벨로 한다(어느 Dockerfile·리비전·사용자).</li>
-<li>보안 스캔(취약점·SBOM)은 Harbor/Trivy가 별도로 채우며, Dockerizer는 라벨만 책임진다.</li>
+<li>보안 스캔(취약점·SBOM)은 Harbor/Trivy가 별도로 채우며, ImageKit는 라벨만 책임진다.</li>
 </ul>
 
 <hr/>
-<p class="note">관련 문서: <a href="Dockerizer-PRD.html">Dockerizer PRD</a> 10절 "이미지 메타데이터 라벨" · 원본 데이터 출처: <code>sse-qa/dockerfile-build-test</code> 빌드(2026-06-10).</p>
-</article><div class='foot'>Dockerizer · 이미지 라벨 실제 예시 · 작성 2026-06-10</div></div></body></html>
+<p class="note">관련 문서: <a href="ImageKit-PRD.html">ImageKit PRD</a> 10절 "이미지 메타데이터 라벨" · 원본 데이터 출처: <code>sse-qa/dockerfile-build-test</code> 빌드(2026-06-10).</p>
+</article><div class='foot'>ImageKit · 이미지 라벨 실제 예시 · 작성 2026-06-10</div></div></body></html>

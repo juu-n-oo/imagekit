@@ -5,8 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
 REPOS=(
-  "dockerizer-backend https://github.com/juu-n-oo/dockerizer-backend.git"
-  "dockerizer-web     https://github.com/juu-n-oo/dockerizer-web.git"
+  "imagekit-backend https://github.com/juu-n-oo/imagekit-backend.git"
+  "imagekit-web     https://github.com/juu-n-oo/imagekit-web.git"
 )
 
 for entry in "${REPOS[@]}"; do

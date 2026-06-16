@@ -139,5 +139,5 @@
 
   <!-- footer -->
   <text x="600" y="876" text-anchor="middle" class="body">결과 — Browse 정규화(<tspan class="mono code">/</tspan>) 와 Kaniko 컨텍스트(<tspan class="mono code">/build-context</tspan>) 의 기준점이 모두 <tspan font-weight="700">PVC 루트</tspan>로 일치 → COPY 소스 경로가 항상 맞는다.</text>
-  <text x="600" y="900" text-anchor="middle" class="mut">Dockerizer · PVC Mount Architecture · 2026-06-05</text>
+  <text x="600" y="900" text-anchor="middle" class="mut">ImageKit · PVC Mount Architecture · 2026-06-05</text>
 </svg>

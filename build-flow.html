@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dockerizer Build Flow</title>
+<title>ImageKit Build Flow</title>
 <style>
   :root {
     --bg: #0f1117;
@@ -288,7 +288,7 @@
 <body>
 <div class="container">
 
-<h1>Dockerizer — 이미지 빌드 흐름</h1>
+<h1>ImageKit — 이미지 빌드 흐름</h1>
 <p class="subtitle">프론트엔드 "빌드 실행" 버튼부터 Harbor push, 실시간 로그 스트리밍까지의 전체 과정</p>
 
 <!-- ─── Section 1: Overview Flow ─── -->
@@ -405,14 +405,14 @@
     </table>
 
     <div class="code-block"><span class="comment">// 생성되는 ImageBuild CR 구조</span>
-<span class="kw">apiVersion</span>: <span class="str">dockerizer.aipub.ten1010.io/v1alpha1</span>
+<span class="kw">apiVersion</span>: <span class="str">imagekit.aipub.ten1010.io/v1alpha1</span>
 <span class="kw">kind</span>: <span class="str">ImageBuild</span>
 <span class="kw">metadata</span>:
   <span class="key">name</span>: <span class="str">imgbuild-joonwoo-20260602120000</span>
   <span class="key">namespace</span>: <span class="str">pjw</span>                       <span class="comment"># Project namespace</span>
   <span class="key">labels</span>:
-    <span class="key">dockerizer.aipub.ten1010.io/dockerfile-id</span>: <span class="str">"42"</span>
-    <span class="key">dockerizer.aipub.ten1010.io/username</span>: <span class="str">"joonwoo"</span>
+    <span class="key">imagekit.aipub.ten1010.io/dockerfile-id</span>: <span class="str">"42"</span>
+    <span class="key">imagekit.aipub.ten1010.io/username</span>: <span class="str">"joonwoo"</span>
 <span class="kw">spec</span>:
   <span class="key">dockerfileContent</span>: |                    <span class="comment"># Dockerfile 전체 내용 (인라인)</span>
     FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
@@ -507,7 +507,7 @@
     <p class="note">
       Controller는 두 개의 Watcher를 운영한다:<br>
       • <strong>ImageBuildWatcher</strong> — ImageBuild CR의 ADDED/MODIFIED 이벤트 감지<br>
-      • <strong>JobWatcher</strong> — <code>managed-by=dockerizer-controller</code> 레이블이 있는 Job 이벤트 감지 → 연관된 CR로 reconcile 트리거
+      • <strong>JobWatcher</strong> — <code>managed-by=imagekit-controller</code> 레이블이 있는 Job 이벤트 감지 → 연관된 CR로 reconcile 트리거
     </p>
   </div>
 

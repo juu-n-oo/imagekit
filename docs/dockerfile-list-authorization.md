@@ -8,7 +8,7 @@
 > ## ✅ 구현 완료 요약 (2026-06-09)
 > - **계약 변경**: 프론트가 `username` 을 직접 넘기던 방식을 폐기. 백엔드가 **토큰 신원**으로 조회하고, 권한에 따라 분기한다.
 > - **멤버**: `GET /api/v1alpha1/dockerfiles?projects=p1,p2` → `project IN(...) AND username=토큰의 호출자` 로 묶어 **본인 소유만** 반환. 생성 일시 최신순.
-> - **관리자**: `GET /api/v1alpha1/dockerfiles?all=true(&username= 선택)` → **전체** 조회(+username 필터), 최신순. `all=true` 는 백엔드가 **토큰 roles 의 `aipub-admin`** (설정 `dockerizer.aipub.admin-roles`) 검증, 비관리자 위조 시 **403**.
+> - **관리자**: `GET /api/v1alpha1/dockerfiles?all=true(&username= 선택)` → **전체** 조회(+username 필터), 최신순. `all=true` 는 백엔드가 **토큰 roles 의 `aipub-admin`** (설정 `imagekit.aipub.admin-roles`) 검증, 비관리자 위조 시 **403**.
 > - **삭제된 프로젝트 처리**: 멤버가 보내는 프로젝트 목록은 프론트 `useAuth()`(UserAuthorityReview)의 **현재 바인딩 프로젝트**라 삭제된 프로젝트는 자동 제외. 거기에 `username` AND 게이트까지 더해 "본인 것"을 완벽 보장.
 > - **미반영(차기)**: 프론트/백엔드 admin 소스 통일 여부(아래 §6 정합성 전제), 배포 후 E2E 검증.
 
@@ -44,7 +44,7 @@
 
 ## 4. 구현 내역
 
-### 백엔드 (`dockerizer-backend`, 커밋 `fc17905`)
+### 백엔드 (`imagekit-backend`, 커밋 `fc17905`)
 - `dockerfile/repository/DockerfileRepository.java`
   - `findByProjectInAndUsernameOrderByCreatedAtDesc(List<String>, String)` (멤버)
   - `findAllByOrderByCreatedAtDesc()` / `findByUsernameOrderByCreatedAtDesc(String)` (관리자)
@@ -57,12 +57,12 @@
   - `all=true` 면 `isAdmin(authentication)`(아래) 검증 → 아니면 `ForbiddenException`
   - 그 외엔 `listForUser(projects, authentication.getName())`
   - `isAdmin()` = `authentication.getAuthorities()` 에 `aipubProperties.getAdminRoles()` 중 하나라도 포함되면 true
-- `aipub/config/AipubProperties.java`: `adminRoles`(기본 `[aipub-admin]`) 추가 — `dockerizer.aipub.admin-roles` 로 오버라이드
+- `aipub/config/AipubProperties.java`: `adminRoles`(기본 `[aipub-admin]`) 추가 — `imagekit.aipub.admin-roles` 로 오버라이드
 - `common/exception/ForbiddenException.java`(신규) + `GlobalExceptionHandler` → **403 ProblemDetail**
-- `application.yaml`: `dockerizer.aipub.admin-roles: [aipub-admin]` 명시
+- `application.yaml`: `imagekit.aipub.admin-roles: [aipub-admin]` 명시
 - 테스트 `DockerfileControllerDocsTest`: list 테스트를 멤버 경로(`?projects=` + principal)로 갱신, REST Docs 파라미터 갱신
 
-### 프론트엔드 (`dockerizer-web`, 커밋 `bcdb8bb`)
+### 프론트엔드 (`imagekit-web`, 커밋 `bcdb8bb`)
 - `api/dockerfile.ts`: `list(projects[])` (params `projects=join(',')`) / `listAll(username?)` (`all=true`)
 - `hooks/useDockerfiles.ts`: `useDockerfileList({ isAdmin, projects, owner })` 단일 훅 — 기존 `useDockerfiles`/`useDockerfilesMulti` 대체
 - `pages/dockerfile/DockerfileListPage.tsx`: 멤버=프로젝트 셀렉터 / 관리자=소유자(username) 서버사이드 필터, 둘 다 최신순 기본

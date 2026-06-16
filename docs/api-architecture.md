@@ -1,4 +1,4 @@
-# Dockerizer API 아키텍처
+# ImageKit API 아키텍처
 
 > 작성일: 2026-06-01  
 > 최종 수정: 2026-06-02  
@@ -8,12 +8,12 @@
 
 ## 1. 개요
 
-Dockerizer는 AIPub의 선택적 플러그인으로, **기존 AIPub Ingress(`aipub-backend-adapter`)에 path를 추가**하여 라우팅한다.
-프론트엔드는 AIPub과 동일한 도메인(`aipub.cluster10.idc1.ten1010.io`)을 사용하며, Ingress가 경로에 따라 dockerizer backend, AIPub backend, 또는 dockerizer-web으로 라우팅한다.
+ImageKit는 AIPub의 선택적 플러그인으로, **기존 AIPub Ingress(`aipub-backend-adapter`)에 path를 추가**하여 라우팅한다.
+프론트엔드는 AIPub과 동일한 도메인(`aipub.cluster10.idc1.ten1010.io`)을 사용하며, Ingress가 경로에 따라 imagekit backend, AIPub backend, 또는 imagekit-web으로 라우팅한다.
 
-- **프론트엔드 접근**: `https://aipub.cluster10.idc1.ten1010.io/dockerizer`
+- **프론트엔드 접근**: `https://aipub.cluster10.idc1.ten1010.io/imagekit`
 - **API 경로**: 기존 AIPub과 동일한 `/api/v1alpha1` prefix 사용 (별도 prefix 없음)
-- **라우팅 분기**: Ingress가 리소스 경로(`dockerfiles`, `builds`, `volumes`, `registries`)를 기준으로 dockerizer backend로 분기
+- **라우팅 분기**: Ingress가 리소스 경로(`dockerfiles`, `builds`, `volumes`, `registries`)를 기준으로 imagekit backend로 분기
 
 ## 2. 전체 요청 흐름
 
@@ -25,8 +25,8 @@ Dockerizer는 AIPub의 선택적 플러그인으로, **기존 AIPub Ingress(`aip
                                               │
                   ┌───────────────────────────┼───────────────────┐
                   ▼                           ▼                   ▼
-           dockerizer backend           AIPub backend       dockerizer-web
-           /api/v1alpha1/                /api/v1alpha1/       /dockerizer
+           imagekit backend           AIPub backend       imagekit-web
+           /api/v1alpha1/                /api/v1alpha1/       /imagekit
             dockerfiles                   login, logout,
             builds                        selfsubjectreviews
             volumes                       k8sproxy/**
@@ -39,15 +39,15 @@ Dockerizer는 AIPub의 선택적 플러그인으로, **기존 AIPub Ingress(`aip
 
 ## 3. Ingress 라우팅 규칙
 
-기존 AIPub Ingress(`aipub-backend-adapter`)에 dockerizer 경로가 추가된다.
+기존 AIPub Ingress(`aipub-backend-adapter`)에 imagekit 경로가 추가된다.
 `install.sh`가 `kubectl patch`로 아래 path를 추가한다:
 
 | 경로 | 대상 서비스 | 설명 |
 |------|-----------|------|
-| `/api/v1alpha1/dockerfiles` | dockerizer-backend :8080 | Dockerfile CRUD |
-| `/api/v1alpha1/builds` | dockerizer-backend :8080 | 이미지 빌드 |
-| `/api/v1alpha1/volumes` | dockerizer-backend :8080 | AIPubVolume 조회/탐색 |
-| `/dockerizer` | dockerizer-web :80 | 프론트엔드 정적 파일 |
+| `/api/v1alpha1/dockerfiles` | imagekit-backend :8080 | Dockerfile CRUD |
+| `/api/v1alpha1/builds` | imagekit-backend :8080 | 이미지 빌드 |
+| `/api/v1alpha1/volumes` | imagekit-backend :8080 | AIPubVolume 조회/탐색 |
+| `/imagekit` | imagekit-web :80 | 프론트엔드 정적 파일 |
 
 기존 AIPub 경로는 그대로 유지된다:
 
@@ -74,12 +74,12 @@ Dockerizer는 AIPub의 선택적 플러그인으로, **기존 AIPub Ingress(`aip
   ← Set-Cookie: AIPUB_ACCESS_COOKIE (JWT, HttpOnly, Secure)
 ```
 
-### dockerizer backend 요청 인증 (Token Introspection)
+### imagekit backend 요청 인증 (Token Introspection)
 
-dockerizer backend는 자체 엔드포인트 요청 시 AIPub의 `selfsubjectreviews`를 서버-to-서버로 호출하여 인증한다.
+imagekit backend는 자체 엔드포인트 요청 시 AIPub의 `selfsubjectreviews`를 서버-to-서버로 호출하여 인증한다.
 
 ```
-브라우저 → Ingress → dockerizer backend
+브라우저 → Ingress → imagekit backend
   → AipubAuthenticationFilter
     1. AIPUB_ACCESS_COOKIE에서 토큰 추출
     2. AIPub selfsubjectreviews 호출 (클러스터 내부 HTTP, 쿠키 전달)
@@ -105,22 +105,22 @@ dockerizer backend는 자체 엔드포인트 요청 시 AIPub의 `selfsubjectrev
 ```
 [AIPub Ingress (aipub-backend-adapter) — aipub.cluster10.idc1.ten1010.io]
   │
-  ├─ /api/v1alpha1/dockerfiles  → dockerizer-backend Service :8080
-  ├─ /api/v1alpha1/builds       → dockerizer-backend Service :8080
-  ├─ /api/v1alpha1/volumes      → dockerizer-backend Service :8080
-  ├─ /api/v1alpha1/registries   → dockerizer-backend Service :8080
-  ├─ /dockerizer                → dockerizer-web Service :80
+  ├─ /api/v1alpha1/dockerfiles  → imagekit-backend Service :8080
+  ├─ /api/v1alpha1/builds       → imagekit-backend Service :8080
+  ├─ /api/v1alpha1/volumes      → imagekit-backend Service :8080
+  ├─ /api/v1alpha1/registries   → imagekit-backend Service :8080
+  ├─ /imagekit                → imagekit-web Service :80
   │
   ├─ /api/v1alpha1/{login,logout,selfsubjectreviews,k8sproxy}
   │     → aipub-backend-gateway :8080
   ├─ /api (나머지)              → aipub-backend-gateway :8080
   └─ /                          → aipub-backend-adapter :8080
 
-[dockerizer-backend — 클러스터 내부 통신]
+[imagekit-backend — 클러스터 내부 통신]
   └─ AipubAuthenticationFilter → aipub-backend-gateway.aipub.svc.cluster.local:8080
      (selfsubjectreviews Token Introspection)
 ```
 
-- Dockerizer는 자체 Ingress를 생성하지 않는다.
+- ImageKit는 자체 Ingress를 생성하지 않는다.
 - `install.sh`가 기존 AIPub Ingress에 `kubectl patch`로 path를 추가한다.
-- AIPub 서비스 URL은 Helm values로 주입 (`DOCKERIZER_AIPUB_BASE_URL`).
+- AIPub 서비스 URL은 Helm values로 주입 (`IMAGEKIT_AIPUB_BASE_URL`).

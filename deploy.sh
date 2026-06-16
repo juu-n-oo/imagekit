@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Dockerizer 일괄 배포 헬퍼
+# ImageKit 일괄 배포 헬퍼
 #
 # `make install` 을 ARGS(이미지 빌드 + 무확인) 와 함께 실행한다.
 # 매번 `make install ARGS="--build --skip-confirmation"` 를 치지 않아도 되도록 감싼 스크립트.

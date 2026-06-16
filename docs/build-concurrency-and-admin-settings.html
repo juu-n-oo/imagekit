@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>빌드 동시성 제어 & 관리자 설정 설계 노트</title>
+    <style>
+      :root {
+        --bg: #0f1117;
+        --card: #181b24;
+        --card2: #1f2430;
+        --border: #2a2f3c;
+        --text: #e6e8ee;
+        --muted: #9aa3b2;
+        --primary: #3074ff;
+        --green: #22c55e;
+        --amber: #f59e0b;
+        --red: #ef4444;
+        --purple: #8b5cf6;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Apple SD Gothic Neo',
+          'Malgun Gothic', sans-serif;
+        line-height: 1.7;
+        font-size: 16px;
+      }
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 48px 24px 96px;
+      }
+      h1 {
+        font-size: 30px;
+        line-height: 1.3;
+        margin: 0 0 8px;
+        letter-spacing: -0.02em;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 15px;
+        margin-bottom: 40px;
+      }
+      h2 {
+        font-size: 22px;
+        margin: 48px 0 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+        letter-spacing: -0.01em;
+      }
+      h3 {
+        font-size: 17px;
+        margin: 28px 0 10px;
+        color: #c9d2e3;
+      }
+      p {
+        margin: 12px 0;
+      }
+      ul,
+      ol {
+        margin: 12px 0;
+        padding-left: 22px;
+      }
+      li {
+        margin: 6px 0;
+      }
+      code {
+        background: var(--card2);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 1px 6px;
+        font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+        font-size: 13.5px;
+        color: #d6e2ff;
+      }
+      pre {
+        background: #11141c;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 18px 20px;
+        overflow-x: auto;
+        margin: 16px 0;
+      }
+      pre code {
+        background: none;
+        border: none;
+        padding: 0;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #cdd6e8;
+      }
+      .cmt {
+        color: #6b7689;
+      }
+      .kw {
+        color: #c98aff;
+      }
+      .str {
+        color: #7fd28a;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 22px 24px;
+        margin: 20px 0;
+      }
+      .tldr {
+        background: linear-gradient(135deg, rgba(48, 116, 255, 0.12), rgba(139, 92, 246, 0.1));
+        border: 1px solid rgba(48, 116, 255, 0.35);
+      }
+      .tldr b {
+        color: #9db8ff;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 18px 0;
+        font-size: 14.5px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+        vertical-align: top;
+      }
+      th {
+        color: #c9d2e3;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+        border-bottom: 1px solid var(--border);
+      }
+      tbody tr:hover {
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .pill {
+        display: inline-block;
+        font-size: 12px;
+        font-weight: 700;
+        padding: 2px 9px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+      .p-rec {
+        background: rgba(34, 197, 94, 0.16);
+        color: #6ee7a0;
+        border: 1px solid rgba(34, 197, 94, 0.4);
+      }
+      .p-ok {
+        background: rgba(48, 116, 255, 0.16);
+        color: #8fb4ff;
+        border: 1px solid rgba(48, 116, 255, 0.4);
+      }
+      .p-care {
+        background: rgba(245, 158, 11, 0.14);
+        color: #f5c168;
+        border: 1px solid rgba(245, 158, 11, 0.4);
+      }
+      .p-no {
+        background: rgba(239, 68, 68, 0.14);
+        color: #f59ca0;
+        border: 1px solid rgba(239, 68, 68, 0.4);
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 14px;
+        margin: 18px 0;
+      }
+      @media (max-width: 760px) {
+        .grid2 {
+          grid-template-columns: 1fr;
+        }
+      }
+      .opt {
+        background: var(--card2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px 18px;
+      }
+      .opt .h {
+        font-weight: 700;
+        font-size: 15px;
+        margin-bottom: 6px;
+      }
+      .opt.rec {
+        border-color: rgba(34, 197, 94, 0.45);
+        background: linear-gradient(180deg, rgba(34, 197, 94, 0.07), transparent);
+      }
+      .opt .verdict {
+        font-size: 13px;
+        margin-top: 10px;
+        color: var(--muted);
+      }
+      .callout {
+        border-left: 3px solid var(--amber);
+        background: rgba(245, 158, 11, 0.07);
+        border-radius: 0 10px 10px 0;
+        padding: 12px 18px;
+        margin: 16px 0;
+      }
+      .callout.good {
+        border-left-color: var(--green);
+        background: rgba(34, 197, 94, 0.07);
+      }
+      .callout.info {
+        border-left-color: var(--primary);
+        background: rgba(48, 116, 255, 0.07);
+      }
+      .ref {
+        font-family: 'SF Mono', ui-monospace, Menlo, monospace;
+        font-size: 12.5px;
+        color: #8fb4ff;
+      }
+      .toc {
+        font-size: 14.5px;
+      }
+      .toc a {
+        color: #9db8ff;
+        text-decoration: none;
+      }
+      .toc a:hover {
+        text-decoration: underline;
+      }
+      .step {
+        font-size: 12px;
+        color: var(--muted);
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>빌드 동시성 제어 &amp; 관리자 설정 설계 노트</h1>
+      <div class="sub">
+        ImageKit · ImageBuild 컨트롤러 — Kueue 없이 네임스페이스별 동시 빌드를 제어하는 방법, 워크큐
+        FIFO 문제, 그리고 관리자 페이지에 둘 설정 항목 검토 · 2026-06-16
+      </div>
+
+      <div class="card tldr">
+        <p style="margin-top: 0">
+          <b>TL;DR</b>
+        </p>
+        <ul style="margin-bottom: 0">
+          <li>
+            현재 컨트롤러는 동시 빌드 제어가 <b>전혀 없다</b> — <code>handlePreparing</code> 이 무조건
+            즉시 Kaniko Job 을 만든다.
+          </li>
+          <li>
+            Kueue 없이도 제어 가능하다. <b>방법 A(컨트롤러 게이트)</b> 또는
+            <b>방법 C(Job suspend)</b> 가 적합하고, ResourceQuota(방법 B)는 빌드를 "대기"가 아닌
+            "실패"로 떨어뜨려 부적합하다.
+          </li>
+          <li>
+            컨트롤러 워크큐는 <b>FIFO 가 아니다</b>(rate-limiting queue). 진짜 순서 보장은 워크큐가 아니라
+            <code>creationTimestamp</code> 정렬을 reconciler 에 직접 넣어야 나온다.
+          </li>
+          <li>
+            빌드 경합이 잦지 않은 현 단계에서는 <b>Kueue 는 과하다.</b> 단순 자체 게이트(C 방식)로 가고,
+            노드풀 분리는 nodeSelector 로 별도 해결. 다수 팀의 공정 공유·우선순위가 필요해지면 그때 Kueue.
+          </li>
+          <li>
+            관리자 페이지 1차 세트: <b>① 동시 빌드 수 ② Pod 리소스 한도 ③ 빌드 타임아웃(기본+상한)</b>.
+            저장소는 전용 CR(<code>BuildPolicy</code>) 권장.
+          </li>
+        </ul>
+      </div>
+
+      <div class="card toc">
+        <b>목차</b>
+        <ol style="margin-bottom: 0">
+          <li><a href="#now">현재 상태 — 제어 장치가 없다</a></li>
+          <li><a href="#ways">Kueue 없이 동시 빌드를 제어하는 3가지 방법</a></li>
+          <li><a href="#fifo">워크큐는 FIFO 가 아니다</a></li>
+          <li><a href="#pseudo">의사코드 — FIFO 게이트</a></li>
+          <li><a href="#kueue">Kueue 도입 vs 자체 게이트</a></li>
+          <li><a href="#concepts">노드풀 분리 vs 공정 공유</a></li>
+          <li><a href="#admin">관리자 페이지 설정 항목</a></li>
+          <li><a href="#decision">이번 결정 요약</a></li>
+        </ol>
+      </div>
+
+      <!-- 1 -->
+      <h2 id="now">1. 현재 상태 — 제어 장치가 없다</h2>
+      <p>
+        ImageBuild 는 <code>Pending → Preparing → Building → Succeeded/Failed</code> 5단계 phase 만
+        있고 <b>"대기/Queued" 상태가 없다</b>
+        <span class="ref">(ImageBuildConstants.java:17-21)</span>. reconciler 의
+        <code>handlePreparing</code> 은 슬롯 검사 없이 무조건 Kaniko Job 을 생성한다
+        <span class="ref">(ImageBuildReconciler.java:106-127)</span>. 즉 동시 실행 수는 전적으로 k8s
+        스케줄러에 위임돼 있다.
+      </p>
+      <p>추가로 <b>Kaniko Pod 자체의 자원·배치 제어도 비어 있다</b>:</p>
+      <ul>
+        <li>
+          컨테이너에 <code>resources(requests/limits)</code> 가 <b>전혀 없다</b> → 빌드 Pod 크기 무제한
+          <span class="ref">(KanikoJobFactory.java:95-104)</span>
+        </li>
+        <li>
+          <code>nodeSelector / toleration / affinity</code> 없음 → 노드풀 분리 미구현
+          <span class="ref">(KanikoJobFactory.java:88-91)</span>
+        </li>
+        <li>
+          <code>--cache=false</code> 하드코딩 <span class="ref">(:120)</span>,
+          <code>securityContext</code> 없음(root 제어 없음)
+        </li>
+      </ul>
+      <p class="muted">
+        한편 컨트롤러는 <code>workerCount=1</code> + single replica(leader election 없음)로
+        <b>완전 직렬</b> reconcile 한다. 이 직렬성이 아래 게이트 구현을 race 없이 안전하게 만든다.
+      </p>
+
+      <!-- 2 -->
+      <h2 id="ways">2. Kueue 없이 동시 빌드를 제어하는 3가지 방법</h2>
+      <div class="grid2">
+        <div class="opt rec">
+          <div class="h">A. 컨트롤러 레벨 게이트 <span class="pill p-rec">권장</span></div>
+          <div>
+            <code>handlePreparing</code> 에서 같은 ns 의 Building 수를 세고, 상한 이상이면 Job 을 만들지
+            않고 Queued 로 두고 requeue.
+          </div>
+          <div class="verdict">
+            ✓ 우아한 큐잉(에러 아님) · ✓ UI "대기 중" 표시 · ✓ 직렬 구조라 race 없음
+          </div>
+        </div>
+        <div class="opt">
+          <div class="h">B. ResourceQuota <span class="pill p-no">부적합</span></div>
+          <div>
+            ns 에 <code>count/pods</code> · <code>requests.cpu</code> 등으로 선언적 제한. 코드 0줄.
+          </div>
+          <div class="verdict">
+            ✗ <code>backoffLimit:0</code> 라 quota 초과 시 빌드가 <b>실패</b>로 떨어짐 · ✗ TTL 1시간 동안
+            완료 Job 도 quota 점유 · ✗ "대기" UX 불가
+          </div>
+        </div>
+        <div class="opt">
+          <div class="h">C. Job suspend <span class="pill p-ok">절충</span></div>
+          <div>
+            Job 을 <code>suspend:true</code> 로 만들어두고, 슬롯이 나면 <code>suspend:false</code> 로
+            patch.
+          </div>
+          <div class="verdict">
+            ✓ suspend 동안 <code>activeDeadlineSeconds</code> 미카운트(대기시간이 타임아웃 안 깎음) · 게이트
+            로직은 A와 동일하게 필요 · Kueue 전환이 쉬움
+          </div>
+        </div>
+      </div>
+      <p>
+        A·C 모두 <b>"슬롯 판정" 로직(<code>admit()</code>)은 동일</b>하다. 차이는 Job 을 "언제 만드냐"
+        (A=슬롯 확보 후 / C=미리 suspend 로 만들고 나중에 깨움)뿐이다.
+      </p>
+
+      <!-- 3 -->
+      <h2 id="fifo">3. 워크큐는 FIFO 가 아니다</h2>
+      <p>
+        컨트롤러는 <code>ControllerBuilder.defaultBuilder()</code> 의
+        <b>rate-limiting workqueue</b> 를 쓴다 <span class="ref">(InformerControllerConfiguration.java:95)</span>.
+        "큐에 쌓이면 들어온 순서대로 처리되겠지"는 <b>틀렸다</b>:
+      </p>
+      <ul>
+        <li>
+          <b>dedup set</b>: 같은 <code>Request(ns, name)</code> 중복은 하나로 합쳐진다 → 이벤트 순서 ≠
+          처리 순서
+        </li>
+        <li>
+          <b>requeue = 지수 백오프</b>: 슬롯 없어 requeue 만 반복하면, <b>먼저 대기한 빌드일수록 백오프가
+          쌓여 더 늦게</b> 깨어난다 → FIFO 가 아니라 <b>역전(starvation)</b>
+        </li>
+        <li>
+          <b>resync(45초)·Job 완료 이벤트</b>로 깨어나는 것도 순서와 무관(indexer 해시맵 순회)
+        </li>
+      </ul>
+      <div class="callout good">
+        <b>해결</b> — 워크큐를 "순서 큐"로 쓰지 말고 <b>"재평가하라는 신호"</b>로만 쓴다. 실제 순서는
+        reconciler 안에서 <code>metadata.creationTimestamp</code>(동률 시 name/uid tie-break)로 정렬해
+        결정한다. 그러면 워크큐가 누구를 먼저 깨우든 항상 생성순 FIFO 로 수렴한다.
+      </div>
+
+      <!-- 4 -->
+      <h2 id="pseudo">4. 의사코드 — FIFO 게이트</h2>
+      <p class="step">설정 (ControllerProperties)</p>
+      <pre><code><span class="cmt">// 네임스페이스당 동시 빌드(Building) 상한. 0 이하면 무제한.</span>
+<span class="kw">private int</span> maxConcurrentBuildsPerNamespace = 3;
+<span class="cmt">// 슬롯 대기 시 재평가 간격(초). 지수 백오프 대신 고정 지연으로 starvation 방지.</span>
+<span class="kw">private int</span> queueRequeueSeconds = 10;</code></pre>
+
+      <p class="step">게이트가 붙은 handlePreparing</p>
+      <pre><code><span class="kw">private</span> Result handlePreparing(ImageBuildResource cr) {
+    <span class="cmt">// ── FIFO 동시성 게이트 ──</span>
+    <span class="kw">if</span> (!admit(cr)) {                       <span class="cmt">// 아직 내 차례 아님</span>
+        statusUpdater.transitionTo(cr, PHASE_QUEUED, <span class="str">"Waiting for a build slot"</span>);
+        <span class="cmt">// 고정 지연 requeue (addRateLimited 지수 백오프가 아님)</span>
+        <span class="kw">return new</span> Result(<span class="kw">true</span>, Duration.ofSeconds(props.getQueueRequeueSeconds()));
+    }
+    <span class="cmt">// 슬롯 확보 → 기존 Job 생성 로직 그대로</span>
+    batchV1Api.createNamespacedJob(ns, jobFactory.createKanikoJob(cr)).execute();
+    statusUpdater.transitionTo(cr, PHASE_BUILDING, <span class="str">"Kaniko job created, building image"</span>);
+    <span class="kw">return new</span> Result(<span class="kw">false</span>);
+}</code></pre>
+
+      <p class="step">FIFO 판정 — 핵심</p>
+      <pre><code><span class="cmt">/** 워크큐 순서와 무관하게, creationTimestamp 기준 결정론적 FIFO 로 입장 여부를 정한다. */</span>
+<span class="kw">private boolean</span> admit(ImageBuildResource cr) {
+    <span class="kw">int</span> limit = props.getMaxConcurrentBuildsPerNamespace();
+    <span class="kw">if</span> (limit &lt;= 0) <span class="kw">return true</span>;                          <span class="cmt">// 무제한</span>
+
+    List&lt;ImageBuildResource&gt; peers = lister.namespace(cr.getNamespace()).list(); <span class="cmt">// 캐시</span>
+    <span class="kw">int</span> running = 0, aheadInQueue = 0;
+    <span class="kw">for</span> (ImageBuildResource p : peers) {
+        String phase = currentPhase(p);
+        <span class="kw">if</span> (PHASE_BUILDING.equals(phase)) running++;                 <span class="cmt">// 슬롯 점유 중</span>
+        <span class="kw">else if</span> (PHASE_PENDING.equals(phase) || PHASE_PREPARING.equals(phase)
+                 || PHASE_QUEUED.equals(phase)) {
+            <span class="kw">if</span> (isBefore(p, cr)) aheadInQueue++;                     <span class="cmt">// 나보다 먼저 줄 선 대기자</span>
+        }
+        <span class="cmt">// Succeeded/Failed 는 슬롯을 안 먹으므로 무시</span>
+    }
+    <span class="cmt">// 내 앞의 (실행 중 + 먼저 줄 선 대기자) 합이 빈 슬롯 안에 들어오면 입장</span>
+    <span class="kw">return</span> running + aheadInQueue &lt; limit;
+}
+
+<span class="cmt">/** FIFO 기준: 생성시각, 동률이면 name 으로 tie-break → 모든 리컨실에서 동일 결정. */</span>
+<span class="kw">private boolean</span> isBefore(ImageBuildResource a, ImageBuildResource b) {
+    <span class="kw">int</span> c = a.getMetadata().getCreationTimestamp()
+             .compareTo(b.getMetadata().getCreationTimestamp());
+    <span class="kw">return</span> c != 0 ? c &lt; 0 : a.getName().compareTo(b.getName()) &lt; 0;
+}</code></pre>
+      <p class="muted">
+        예시(limit=3): running=2, 내 앞 대기자 0 → <code>2+0&lt;3</code> 입장. 내 앞 대기자 1 →
+        <code>2+1&lt;3</code> 거짓 → 그 사람이 먼저. 워크큐가 나를 먼저 깨워도 새치기 불가.
+      </p>
+
+      <h3>의사코드에 안 드러나는 주의점</h3>
+      <ul>
+        <li>
+          <b>캐시 lag → 순간 over-admit</b>: informer 캐시는 eventually consistent. 방금 Building 전환한
+          CR 이 캐시에 안 보이면 <code>running</code> 과소집계. <code>workerCount=1</code> 직렬이라 폭주는
+          없지만 짧은 윈도우에 <code>limit+1</code> 가능 → 단일 상한 수준에선 허용 가능한 타협.
+        </li>
+        <li>
+          <b>대기자 깨우기</b>: Job 완료 이벤트는 그 CR 만 enqueue → 대기 중 다른 CR 은 자동으로 안 깨어남.
+          그래서 <code>requeueAfter(고정 N초)</code> 폴링이 백업으로 필요.
+        </li>
+        <li>
+          <b>Pending 도 대기자로 카운트</b>: 늦게 온 빌드가 ConfigMap 먼저 만들고 새치기하는 것 방지.
+        </li>
+        <li>
+          <b>Queued phase 생략 옵션</b>: 새 phase 가 부담이면 Preparing 에 머물게 하고 message 만 갱신해도
+          동작(최소 변경). 단 UI 구분 불가.
+        </li>
+      </ul>
+
+      <!-- 5 -->
+      <h2 id="kueue">5. Kueue 도입 vs 자체 게이트</h2>
+      <p>Kueue 도 공짜가 아니다 — 우리 구조에서는 통합 비용이 따로 든다:</p>
+      <ul>
+        <li>
+          <b>클러스터 레벨 설치</b>(컨트롤러+웹훅+CRD) → 네임스페이스가 아닌 클러스터 컴포넌트라 AIPub
+          플랫폼팀 조율 전제
+        </li>
+        <li>
+          <b>글루 코드</b>: Kueue 가 Job 을 suspend/admit 하는 상태를 우리 phase 모델(Building=Job
+          created)과 동기화해야 함 — 우리가 이미 Job 을 만들고 phase 를 관리하므로
+        </li>
+        <li><b>운영 부담</b>: 버전·업그레이드 관리, 디버깅 표면 증가</li>
+      </ul>
+
+      <h3>진짜 결정 기준 — "복잡도"가 아니라 "요구사항의 끝"</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>요구사항</th>
+            <th>권장</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>네임스페이스/프로젝트당 <b>단순 상한</b> N개</td>
+            <td><span class="pill p-rec">자체 게이트 (A 또는 C)</span></td>
+          </tr>
+          <tr>
+            <td>
+              + 우선순위, 공정 공유, CPU/GPU 노드풀별 쿼터, 쿼터 빌림·반납, preemption, 코호트
+            </td>
+            <td><span class="pill p-ok">Kueue</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="callout info">
+        자체 게이트의 함정은 "단일 상한"에서 멈추지 않을 때다. 우선순위·공정공유·리소스쿼터를 하나씩 덧붙이면
+        결국 <b>미니 Kueue 를 직접 만드는 꼴</b>이 된다. 그 지점이 보이면 처음부터 Kueue 가 맞다.
+      </div>
+      <p>
+        <b>현 단계 결론</b>: MVP 검증 단계이고 빌드 경합이 잦지 않으므로 <b>자체 게이트(C 방식)</b>로 간다.
+        C(suspend)는 Kueue 도 suspend 기반이라, 나중에 <code>kueue.x-k8s.io/queue-name</code> 라벨 부착
+        + 게이트 제거로 전환이 매끄럽다. 노드풀 분리는 nodeSelector 로 별도 해결.
+      </p>
+
+      <!-- 6 -->
+      <h2 id="concepts">6. 노드풀 분리 vs 공정 공유</h2>
+      <h3>노드풀 분리 — "얼마나"가 아니라 "어디서"</h3>
+      <p>
+        리소스 양 제한이 아니라 <b>어떤 워크로드가 어떤 노드 그룹에서 실행되느냐</b>를 가르는 배치 정책이다.
+        Kaniko 빌드는 GPU 가 전혀 필요 없으므로(CPU·메모리·디스크 작업), 빌드 Pod 가 GPU 노드의 자원을
+        잡아먹어 학습 워크로드를 밀어내지 않도록 <b>CPU 전용 노드풀로 격리</b>한다. 메커니즘은
+        <code>nodeSelector</code> / <code>taint+toleration</code>.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th>개념</th>
+            <th>의미</th>
+            <th>메커니즘</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>노드풀 분리</td>
+            <td><b>어디서</b> 도느냐 (배치)</td>
+            <td>nodeSelector / taint·toleration</td>
+          </tr>
+          <tr>
+            <td>Pod 리소스</td>
+            <td>Pod 하나가 <b>얼마</b> 쓰냐</td>
+            <td>컨테이너 requests/limits</td>
+          </tr>
+          <tr>
+            <td>네임스페이스 총량</td>
+            <td>ns 전체가 <b>얼마까지</b></td>
+            <td>ResourceQuota</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="muted">
+        Kueue 의 <b>ResourceFlavor</b> 가 "노드풀"에 대응하고 거기에 쿼터(양)를 묶어 선언하기 때문에, Kueue
+        에서는 "어디서 + 얼마나"가 합쳐져 보인다. 그래서 노드풀 분리 + 쿼터를 함께 원할 때 Kueue 가 빛난다.
+      </p>
+
+      <h3>공정 공유(fair sharing) — 놀면 빌려주고, 주인 오면 반납</h3>
+      <p>
+        여러 팀이 <b>하나의 공유 풀</b>을 나눠 쓸 때, 독식을 막으면서 자원을 놀리지 않는 탄력적 분배다. 총
+        용량 10 슬롯을 A·B·C 가 공유한다고 하면:
+      </p>
+      <ul>
+        <li>
+          <b>고정 상한</b>(ns당 3): B·C 가 안 쓰면 6 슬롯이 놀고, A 는 상한 3에 막혀 못 늘린다 → 낭비 +
+          경직
+        </li>
+        <li>
+          <b>공정 공유</b>: B·C 가 놀 때 A 가 빈 슬롯을 <b>빌려서</b> 다 쓰고, B 가 빌드를 내면 시스템이 B
+          의 <b>보장 몫</b>을 위해 A 의 초과분을 회수(신규 차단 또는 실행 중 빌드 <b>선점/preemption</b>)
+        </li>
+      </ul>
+      <p>
+        즉 <b>"보장된 최소 몫 + 남으면 빌려 쓰고 + 주인이 오면 반납"</b>. Kueue 의 Cohort +
+        <code>nominalQuota</code> + <code>borrowingLimit</code> 으로 자동화되며, 자체 게이트로 재현하기
+        가장 어려운 부분이다. 여러 프로젝트가 빌드 슬롯을 두고 <b>실제로 경합</b>할 때라야 의미가 있다.
+      </p>
+
+      <!-- 7 -->
+      <h2 id="admin">7. 관리자 페이지 설정 항목</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>카테고리</th>
+            <th>설정</th>
+            <th>현재 상태</th>
+            <th>노출</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>동시성</td>
+            <td>프로젝트당 최대 동시 빌드 수</td>
+            <td>없음(이번 추가)</td>
+            <td><span class="pill p-rec">1순위</span></td>
+          </tr>
+          <tr>
+            <td rowspan="2">리소스</td>
+            <td>Kaniko Pod CPU/메모리 requests·limits</td>
+            <td><b>없음(무제한)</b></td>
+            <td><span class="pill p-rec">1순위</span></td>
+          </tr>
+          <tr>
+            <td>ephemeral-storage limit</td>
+            <td>없음</td>
+            <td><span class="pill p-ok">가치</span></td>
+          </tr>
+          <tr>
+            <td rowspan="3">타임아웃·수명</td>
+            <td>빌드 타임아웃 기본값</td>
+            <td>properties(정적)</td>
+            <td><span class="pill p-rec">권장</span></td>
+          </tr>
+          <tr>
+            <td>사용자 지정 타임아웃 <b>상한(cap)</b></td>
+            <td>없음(무제한 지정 가능)</td>
+            <td><span class="pill p-rec">권장</span></td>
+          </tr>
+          <tr>
+            <td>빌드 Job/Pod TTL(=로그 보존 시간)</td>
+            <td>properties(정적)</td>
+            <td><span class="pill p-ok">가치</span></td>
+          </tr>
+          <tr>
+            <td rowspan="2">배치</td>
+            <td>빌드 전용 노드풀(nodeSelector/toleration)</td>
+            <td><b>없음</b></td>
+            <td><span class="pill p-ok">가치</span></td>
+          </tr>
+          <tr>
+            <td>priorityClassName</td>
+            <td>없음</td>
+            <td><span class="pill p-care">신중</span></td>
+          </tr>
+          <tr>
+            <td rowspan="3">빌드 동작</td>
+            <td>빌드 캐시 on/off + 캐시 리포</td>
+            <td><code>--cache=false</code> 하드코딩</td>
+            <td><span class="pill p-ok">가치</span></td>
+          </tr>
+          <tr>
+            <td>registry insecure / skip-TLS</td>
+            <td>properties</td>
+            <td><span class="pill p-care">보안 민감</span></td>
+          </tr>
+          <tr>
+            <td>Kaniko executor 이미지 버전</td>
+            <td>properties</td>
+            <td><span class="pill p-care">운영자 고정</span></td>
+          </tr>
+          <tr>
+            <td rowspan="5">거버넌스<br /><span class="muted">(post-MVP)</span></td>
+            <td>허용 Base 이미지 화이트리스트</td>
+            <td>없음</td>
+            <td><span class="pill p-ok">가치</span></td>
+          </tr>
+          <tr>
+            <td>태그 정책(latest 금지/컨벤션)</td>
+            <td>없음</td>
+            <td><span class="pill p-ok">가치</span></td>
+          </tr>
+          <tr>
+            <td>root 금지(runAsNonRoot 강제)</td>
+            <td>없음</td>
+            <td><span class="pill p-ok">가치</span></td>
+          </tr>
+          <tr>
+            <td>COPY/ADD · ADD-from-URL 정책</td>
+            <td>백엔드 하드코딩 reject</td>
+            <td><span class="pill p-care">신중</span></td>
+          </tr>
+          <tr>
+            <td>이미지 최대 크기 제한</td>
+            <td>없음</td>
+            <td><span class="pill p-care">신중</span></td>
+          </tr>
+          <tr>
+            <td>가시성<br /><span class="muted">(설정 아님)</span></td>
+            <td>실행 중 빌드 현황, 프로젝트별 빌드 수·실패율</td>
+            <td>—</td>
+            <td><span class="pill p-ok">가치</span></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>설계상 꼭 짚을 점 4가지</h3>
+      <ol>
+        <li>
+          <b>저장소 아키텍처가 가장 큰 결정.</b> 현재 <code>ControllerProperties</code> 는
+          <code>@ConfigurationProperties</code>(env/yaml, <b>재시작 필요</b>)라 정적이다. 재배포 없이 런타임
+          변경하려면 → <b>전용 CR</b>(<code>BuildPolicy</code>/<code>BuildSettings</code>) 권장. AIPub CR
+          스타일과 일관 + GitOps·감사·RBAC 친화 + 컨트롤러가 informer 로 watch 가능. (DB·ConfigMap 은
+          차선)
+        </li>
+        <li>
+          <b>전역 기본 + 프로젝트별 override 계층.</b> 대부분 항목은 "전역 default + 프로젝트마다 다르게"가
+          자연스럽다. 처음부터 2계층으로 모델링.
+        </li>
+        <li>
+          <b>노출하면 위험한 항목 구분.</b> <code>registryInsecure</code>/<code>skipTlsVerify</code>/<code>kanikoImage</code>
+          는 클러스터 보안·안정성 직결 → 관리자 UI 보다 Helm values 고정이 안전.
+        </li>
+        <li>
+          <b>MVP 범위.</b> 거버넌스(화이트리스트·정책 강제)는 post-MVP. 1차는 운영 파라미터로 좁힌다.
+        </li>
+      </ol>
+
+      <h3>1차 추천 세트 (MVP)</h3>
+      <div class="card" style="margin-bottom: 0">
+        <ol style="margin: 0">
+          <li><b>프로젝트당 최대 동시 빌드 수</b> (이번 게이트와 직접 연결)</li>
+          <li><b>Kaniko Pod 리소스 requests/limits</b> (지금 무제한 — 노드 안정성상 사실상 필수)</li>
+          <li><b>빌드 타임아웃 기본값 + 사용자 지정 상한</b></li>
+          <li class="muted">(여력 되면) 빌드 전용 노드풀 지정 + 빌드 현황 가시화</li>
+        </ol>
+      </div>
+
+      <!-- 8 -->
+      <h2 id="decision">8. 이번 결정 요약</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>주제</th>
+            <th>결정</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>동시 빌드 제어 방식</td>
+            <td>
+              <span class="pill p-rec">자체 게이트 (C: Job suspend)</span> — Kueue 는 현 단계 과함
+            </td>
+          </tr>
+          <tr>
+            <td>순서 보장</td>
+            <td>워크큐가 아니라 <code>creationTimestamp</code> 정렬로 결정론적 FIFO</td>
+          </tr>
+          <tr>
+            <td>노드풀 분리</td>
+            <td>Kueue 없이 nodeSelector/toleration 으로 별도 해결</td>
+          </tr>
+          <tr>
+            <td>Kueue 도입 트리거</td>
+            <td>다수 팀의 공정 공유·우선순위·노드풀별 쿼터가 실제로 필요해질 때</td>
+          </tr>
+          <tr>
+            <td>관리자 페이지 1차</td>
+            <td>동시 빌드 수 · Pod 리소스 한도 · 타임아웃(기본+상한)</td>
+          </tr>
+          <tr>
+            <td>설정 저장소</td>
+            <td>전용 CR <code>BuildPolicy</code> 검토 (전역+프로젝트 override 2계층)</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="muted" style="margin-top: 28px">
+        ※ 본 문서는 설계 검토 노트다. 실제 구현 시 게이트 도입(C)과 관리자 설정 저장소(CR) 확정 후 진행한다.
+        Kueue 의 admission(Job suspend) 층 동작 원리는
+        <code>kueue-admission-explained.html</code> 참조.
+      </p>
+    </div>
+  </body>
+</html>

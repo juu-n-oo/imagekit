@@ -1,7 +1,7 @@
-# Dockerizer 백엔드 코드 구조 분석
+# ImageKit 백엔드 코드 구조 분석
 
 > **작성일** 2026-06-11 · **대상 커밋** `main` (07621fe 기준) · **분석자** 코드 리뷰
-> **범위** `imagebuild-controller`(k8s 오퍼레이터) + `dockerizer-backend-server`(REST 백엔드)
+> **범위** `imagebuild-controller`(k8s 오퍼레이터) + `imagekit-backend-server`(REST 백엔드)
 > 빌드 산출물·HTML 뷰는 같은 폴더의 `backend-architecture-review.html` 참조 (동일 내용).
 
 이 문서는 두 가지 요청에 답한다.
@@ -39,7 +39,7 @@
 ## 1. 아키텍처 개요
 
 ```
-[브라우저] ──REST──> [dockerizer-backend-server]
+[브라우저] ──REST──> [imagekit-backend-server]
                           │  (1) Dockerfile CRUD → PostgreSQL
                           │  (2) 빌드 트리거: ImageBuild CR 생성
                           ▼
@@ -67,7 +67,7 @@
 - **상태 머신**: `Pending → Preparing → Building → Succeeded/Failed` 단방향 phase 전이(`ImageBuildReconciler.reconcile`).
 - **Event 기록**: 전이/성공/실패를 Normal/Warning Event 로 남겨 `kubectl describe` 관측성 확보(`EventRecorder`).
 - **informer + workqueue 기반 재조정** (C-1/C-3/C-4 전환 후): `SharedIndexInformer`(resync 45s)로 주기 재조정·재시작 회복, 단일 워크큐로 키 직렬화, Lister 캐시 read(`InformerControllerConfiguration`, `ControllerRunner`).
-- **Job informer 라벨 셀렉터**: `app.kubernetes.io/managed-by=dockerizer-controller` 로 자기 소유 Job 만 watch → 노이즈 차단.
+- **Job informer 라벨 셀렉터**: `app.kubernetes.io/managed-by=imagekit-controller` 로 자기 소유 Job 만 watch → 노이즈 차단.
 - **최소 권한 RBAC**: CR/configmap/job/event 에 필요한 verb 만 부여(`clusterrole.yaml`). configmaps 는 get/create 만, jobs 는 delete 없음 등 절제됨.
 - **결정적 라벨 args**: `imageLabels` 를 key 정렬 후 `--label` 생성 → 동일 입력에 동일 Job 스펙(`KanikoJobFactory.kanikoContainer`).
 
@@ -192,7 +192,7 @@ int nextVersion = revisionRepository.findTopByDockerfileIdOrderByVersionDesc(id)
 - 권장: 단건/삭제에도 호출자 소유 또는 admin 검증 추가(목록과 동일 기준).
 
 #### B-6 ⚪ JPA cascade 미설정 — DB ON DELETE CASCADE 에 의존
-`delete()` 주석은 "모든 리비전도 함께 삭제" 라 하지만, JPA 엔티티에는 cascade/orphanRemoval 이 없다. 실제 삭제는 **DB 스키마의 `dockerfile_revisions.dockerfile_id ... ON DELETE CASCADE`** 에 의존한다(`Dockerizer_1.0.0__initial_schema.sql`). 기능상 동작하나, JPA 영속성 컨텍스트는 이를 모른다.
+`delete()` 주석은 "모든 리비전도 함께 삭제" 라 하지만, JPA 엔티티에는 cascade/orphanRemoval 이 없다. 실제 삭제는 **DB 스키마의 `dockerfile_revisions.dockerfile_id ... ON DELETE CASCADE`** 에 의존한다(`ImageKit_1.0.0__initial_schema.sql`). 기능상 동작하나, JPA 영속성 컨텍스트는 이를 모른다.
 - 또한 `dockerfiles.latest_revision_id → dockerfile_revisions` 순환 FK 는 cascade 가 아니다. 삭제 대상 행 자체가 사라지며 정리되므로 현재는 문제 없으나, **삭제 동작이 JPA 가 아닌 DB 제약에 묶여 있음**을 인지해야 한다(ddl-auto: validate 는 cascade 일치까지 검증하지 않음).
 - 권장: 의존 관계를 코드/문서에 명시하거나 JPA cascade 와 DB 제약을 일치.
 
@@ -270,7 +270,7 @@ NGC/HuggingFace 검색은 **외부 인터넷 호출**이다(`nvcr.io`, catalog A
 - 권장: 외부 클라이언트에 connect/read 타임아웃, 에어갭 환경에서의 비활성 기본값 명시.
 
 #### A-12 ⚪ DockerfileValidator 문서 불일치 + 동작 메모
-검증기는 설정(`DockerizerProperties.forbiddenInstructions`) 기반 **denylist** 인데, **REST 설명("COPY는 허용")과 MCP `@Tool` 설명("COPY/ADD … 거부")이 상반**된다. 정규식(`^\s*INSTR\s`)은 라인 시작 기준이라 주석은 오탐하지 않으나, 실제 금지 목록과 문서를 일치시켜야 한다.
+검증기는 설정(`ImageKitProperties.forbiddenInstructions`) 기반 **denylist** 인데, **REST 설명("COPY는 허용")과 MCP `@Tool` 설명("COPY/ADD … 거부")이 상반**된다. 정규식(`^\s*INSTR\s`)은 라인 시작 기준이라 주석은 오탐하지 않으나, 실제 금지 목록과 문서를 일치시켜야 한다.
 - 권장: 금지 지시자 목록을 단일 출처로 두고 REST/MCP/PRD 설명을 동기화.
 
 ---
@@ -308,10 +308,10 @@ NGC/HuggingFace 검색은 **외부 인터넷 호출**이다(`nvcr.io`, catalog A
 | informer+workqueue 구성 | `.../config/InformerControllerConfiguration.java`, `.../reconciler/ControllerRunner.java` |
 | CRD | `helm/imagebuild-controller/templates/crd.yaml` |
 | 컨트롤러 RBAC/HPA | `helm/imagebuild-controller/templates/{clusterrole,hpa}.yaml` |
-| 빌드 트리거/조회 | `dockerizer-backend-server/.../imagebuild/service/ImageBuildService.java` |
+| 빌드 트리거/조회 | `imagekit-backend-server/.../imagebuild/service/ImageBuildService.java` |
 | 빌드 컨트롤러 | `.../imagebuild/controller/ImageBuildController.java` |
 | Dockerfile 서비스/리비전 | `.../dockerfile/service/{DockerfileService,DockerfileRevisionService}.java` |
 | 인가(Dockerfile) | `.../dockerfile/controller/DockerfileController.java` |
 | 예외 매핑 | `.../common/exception/GlobalExceptionHandler.java` |
-| 스키마/cascade | `sql/Dockerizer_1.0.0__initial_schema.sql` |
-| OSIV/JPA 설정 | `dockerizer-backend-server/src/main/resources/application.yaml` |
+| 스키마/cascade | `sql/ImageKit_1.0.0__initial_schema.sql` |
+| OSIV/JPA 설정 | `imagekit-backend-server/src/main/resources/application.yaml` |

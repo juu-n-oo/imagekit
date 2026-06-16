@@ -1,9 +1,9 @@
-# Dockerizer 코드 리팩토링 리뷰 (프론트엔드 · 백엔드)
+# ImageKit 코드 리팩토링 리뷰 (프론트엔드 · 백엔드)
 
 | | |
 |---|---|
 | 작성일 | 2026-06-11 |
-| 대상 | `dockerizer-backend` (`099c84a`) · `dockerizer-web` (`e569ad0`) |
+| 대상 | `imagekit-backend` (`099c84a`) · `imagekit-web` (`e569ad0`) |
 | 범위 | 유지보수성 관점의 **리팩토링 포인트** (코드 스멜·중복·관심사 분리·타입 안전성·테스트). 아키텍처 적정성/보안 인가는 [`backend-architecture-review.md`](backend-architecture-review.md) 참조 |
 | 식별자 | `SRV-n` 백엔드 서버 · `CTL-n` ImageBuild 컨트롤러 · `WEB-n` 프론트엔드 |
 
@@ -38,7 +38,7 @@
 
 ---
 
-## 2. 백엔드 서버 (`dockerizer-backend-server`)
+## 2. 백엔드 서버 (`imagekit-backend-server`)
 
 ### SRV-1 — `ImageBuildService` 의 무타입 Map + Gson 왕복 파싱 · **High**
 `ImageBuildService.java` `listBuilds`/`getCrMap`(`@SuppressWarnings("unchecked")` 다수)이 `Object→Map<String,Object>`·`List<Map<String,Object>>` 로 캐스팅하고, `crMapToResponse` 가 `metadata/labels/annotations` 를 손으로 파헤친 뒤 `parseStatus`/`parseSpec` 이 `gson.fromJson(gson.toJson(obj), …)` 로 **이미 존재하는 타입 클래스로 재직렬화**한다.
@@ -47,14 +47,14 @@
 
 ### SRV-2 — 라벨/어노테이션 상수 3중 정의 · **High**
 `ImageBuildService.java` 가 `LABEL_DOCKERFILE_ID`/`LABEL_REVISION_ID`/`LABEL_USERNAME`/`ANNOTATION_BASE_IMAGE` 를 private 리터럴로 정의. 컨트롤러의 `KanikoJobFactory`·`InformerControllerConfiguration`·`ImageBuildReconciler` 가 `LABEL_MANAGED_BY`/`LABEL_IMAGEBUILD_NAME`/`MANAGER_NAME` 를 각자 재정의. 프론트(`api/build.ts`)도 동일 키를 직접 기록.
-**문제** — 같은 키의 정의가 3곳 이상, 한쪽 변경이 list/status 상관(correlation)을 말없이 깨뜨림. `dockerizer-controller` manager 이름이 세 파일에 리터럴로 흩어짐.
+**문제** — 같은 키의 정의가 3곳 이상, 한쪽 변경이 list/status 상관(correlation)을 말없이 깨뜨림. `imagekit-controller` manager 이름이 세 파일에 리터럴로 흩어짐.
 **권장** — 모든 라벨/어노테이션 키 + `MANAGER_NAME` 를 (공유) `ImageBuildConstants` 로 이동. 두 모듈이 이미 이 클래스를 통째 중복하므로 공유 모듈 추출이 근본 해법(SRV-3 과 묶어 처리).
 
 ### SRV-3 — 모듈 간 CR 모델·상수 중복 (이미 drift 발생) · **High** · 🟢 부분완료
 > 🟢 **부분완료(2026-06-11)**: 서버 `ImageBuildSpec` 에 누락됐던 `imageLabels` 필드 추가로 drift 해소. 공유 Gradle 모듈 추출은 향후 레포 분리 가능성으로 보류.
 서버 `imagebuild/cr/ImageBuildConstants.java` 와 컨트롤러의 동명 클래스는 거의 동일(컨트롤러가 Kaniko/secret prefix 만 추가). `ImageBuildSpec`/`ImageBuildStatus` 도 중복인데 **서버 쪽 `ImageBuildSpec` 에는 컨트롤러에 있는 `imageLabels` 필드가 빠져 있다**. `K8sProperties` 는 두 모듈에서 바이트 단위로 동일.
 **문제** — 와이어 계약(contract)의 진실원본이 둘이고, 이미 필드 누락 drift 가 일어남.
-**권장** — `dockerizer-cr-model`(또는 `dockerizer-common`) Gradle 모듈을 분리해 CR 클래스·상수·`K8sProperties` 를 공유.
+**권장** — `imagekit-cr-model`(또는 `imagekit-common`) Gradle 모듈을 분리해 CR 클래스·상수·`K8sProperties` 를 공유.
 
 ### SRV-4 — `GlobalExceptionHandler` 일반 fallback 부재 + 원문 노출 · **High** · ✅ 완료
 > ✅ **완료(2026-06-11)**: `UpstreamServiceException` + `GlobalExceptionHandler` 의 502/일반 500 fallback 추가 — k8s 응답 원문은 로깅만 하고 클라이언트 body 에 미노출.
@@ -160,7 +160,7 @@ apiVersion/kind/policy 리터럴(`"v1"`,`"ConfigMap"`,`"batch/v1"`,`"Job"`,`"Nev
 
 ---
 
-## 4. 프론트엔드 (`dockerizer-web`)
+## 4. 프론트엔드 (`imagekit-web`)
 
 ### WEB-1 — `DockerfileEditorPage.tsx` 1,891줄 god-component · **High** · ✅ 완료
 > ✅ **완료(2026-06-11)**: DockerfileEditorPage god-component 분해 — 순수 fn → `lib/dockerfile-content.ts`, `useDockerfileEditorState` 훅 + `BuildDialog`/`SaveRevisionDialog`/`LabelEditor`/`InstructionBlock` 추출(페이지 ~1.9k→~700줄).

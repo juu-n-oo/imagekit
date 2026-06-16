@@ -1,0 +1,593 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Kueue는 왜 admission(Job suspend) 층에서 동작하는가</title>
+    <style>
+      :root {
+        --bg: #0f1117;
+        --card: #181b24;
+        --card2: #1f2430;
+        --border: #2a2f3c;
+        --text: #e6e8ee;
+        --muted: #9aa3b2;
+        --primary: #3074ff;
+        --green: #22c55e;
+        --amber: #f59e0b;
+        --red: #ef4444;
+        --purple: #8b5cf6;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Apple SD Gothic Neo',
+          'Malgun Gothic', sans-serif;
+        line-height: 1.7;
+        font-size: 16px;
+      }
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 48px 24px 96px;
+      }
+      h1 {
+        font-size: 30px;
+        line-height: 1.3;
+        margin: 0 0 8px;
+        letter-spacing: -0.02em;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 15px;
+        margin-bottom: 40px;
+      }
+      h2 {
+        font-size: 22px;
+        margin: 48px 0 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+        letter-spacing: -0.01em;
+      }
+      h3 {
+        font-size: 17px;
+        margin: 28px 0 10px;
+        color: #c9d2e3;
+      }
+      p {
+        margin: 12px 0;
+      }
+      code {
+        background: var(--card2);
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 1px 6px;
+        font-family: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+        font-size: 13.5px;
+        color: #d6e2ff;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 22px 24px;
+        margin: 20px 0;
+      }
+      .tldr {
+        background: linear-gradient(135deg, rgba(48, 116, 255, 0.12), rgba(139, 92, 246, 0.1));
+        border: 1px solid rgba(48, 116, 255, 0.35);
+      }
+      .tldr b {
+        color: #9db8ff;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      /* Layer diagram */
+      .layers {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 8px 0;
+      }
+      .layer {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        border-radius: 12px;
+        padding: 16px 20px;
+        border: 1px solid var(--border);
+        background: var(--card2);
+      }
+      .layer .tag {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        padding: 4px 10px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+      .layer .body {
+        flex: 1;
+      }
+      .layer .body .t {
+        font-weight: 700;
+        font-size: 15px;
+      }
+      .layer .body .d {
+        color: var(--muted);
+        font-size: 13.5px;
+      }
+      .lyr-admission {
+        border-color: rgba(48, 116, 255, 0.5);
+      }
+      .lyr-admission .tag {
+        background: rgba(48, 116, 255, 0.18);
+        color: #8db0ff;
+      }
+      .lyr-sched .tag {
+        background: rgba(139, 92, 246, 0.18);
+        color: #c4b3ff;
+      }
+      .lyr-run .tag {
+        background: rgba(34, 197, 94, 0.16);
+        color: #7ee2a8;
+      }
+      .arrow-down {
+        text-align: center;
+        color: var(--muted);
+        font-size: 18px;
+        margin: -4px 0;
+      }
+      /* two column compare */
+      .cols {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin: 18px 0;
+      }
+      @media (max-width: 720px) {
+        .cols {
+          grid-template-columns: 1fr;
+        }
+      }
+      .col {
+        border-radius: 12px;
+        padding: 18px 20px;
+        border: 1px solid var(--border);
+        background: var(--card2);
+      }
+      .col.bad {
+        border-color: rgba(239, 68, 68, 0.4);
+      }
+      .col.good {
+        border-color: rgba(34, 197, 94, 0.4);
+      }
+      .col h4 {
+        margin: 0 0 10px;
+        font-size: 15px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .col.bad h4 {
+        color: #ff9a9a;
+      }
+      .col.good h4 {
+        color: #8be0a8;
+      }
+      .badge {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+      }
+      .b-red {
+        background: rgba(239, 68, 68, 0.16);
+        color: #ff9a9a;
+      }
+      .b-green {
+        background: rgba(34, 197, 94, 0.16);
+        color: #8be0a8;
+      }
+      /* node / pod visual */
+      .node {
+        border: 1px dashed var(--border);
+        border-radius: 10px;
+        padding: 10px;
+        margin-top: 10px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .node .nlabel {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      .pods {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .pod {
+        font-size: 11.5px;
+        font-weight: 700;
+        padding: 5px 9px;
+        border-radius: 7px;
+        color: #fff;
+      }
+      .pod.a {
+        background: #2563eb;
+      }
+      .pod.b {
+        background: #db2777;
+      }
+      .pod.wait {
+        background: #3a4150;
+        color: var(--muted);
+        border: 1px dashed #525a6b;
+      }
+      .reason {
+        display: flex;
+        gap: 14px;
+        padding: 16px 18px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--card2);
+        margin: 12px 0;
+      }
+      .reason .num {
+        flex: 0 0 34px;
+        height: 34px;
+        border-radius: 9px;
+        background: rgba(48, 116, 255, 0.18);
+        color: #8db0ff;
+        font-weight: 800;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 16px;
+      }
+      .reason .rt {
+        font-weight: 700;
+        margin-bottom: 2px;
+      }
+      .reason .rd {
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .flow {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        flex-wrap: wrap;
+        margin: 16px 0;
+      }
+      .step {
+        flex: 1;
+        min-width: 150px;
+        background: var(--card2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 14px;
+        position: relative;
+      }
+      .step .s {
+        font-size: 11px;
+        color: var(--muted);
+        font-weight: 700;
+      }
+      .step .v {
+        font-size: 14px;
+        margin-top: 3px;
+      }
+      .chev {
+        align-self: center;
+        color: var(--muted);
+        padding: 0 8px;
+        font-size: 18px;
+      }
+      .pill {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 6px;
+        font-family: 'SF Mono', ui-monospace, Menlo, monospace;
+        font-size: 12.5px;
+      }
+      .pill-sus {
+        background: rgba(245, 158, 11, 0.16);
+        color: #f5c451;
+      }
+      .pill-run {
+        background: rgba(34, 197, 94, 0.16);
+        color: #8be0a8;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 16px 0;
+        font-size: 14.5px;
+      }
+      th,
+      td {
+        border: 1px solid var(--border);
+        padding: 10px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: var(--card2);
+        font-size: 13px;
+        color: #c9d2e3;
+      }
+      .ok {
+        color: var(--green);
+        font-weight: 700;
+      }
+      .no {
+        color: var(--red);
+        font-weight: 700;
+      }
+      .callout {
+        border-left: 3px solid var(--primary);
+        background: rgba(48, 116, 255, 0.07);
+        padding: 14px 18px;
+        border-radius: 0 10px 10px 0;
+        margin: 18px 0;
+      }
+      .callout.warn {
+        border-left-color: var(--amber);
+        background: rgba(245, 158, 11, 0.08);
+      }
+      .footer {
+        margin-top: 56px;
+        color: var(--muted);
+        font-size: 13px;
+        border-top: 1px solid var(--border);
+        padding-top: 16px;
+      }
+      .kbd {
+        font-family: 'SF Mono', ui-monospace, Menlo, monospace;
+        font-size: 13px;
+        color: #d6e2ff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Kueue는 왜 <em>admission(Job suspend)</em> 층에서 동작하는가</h1>
+      <div class="sub">
+        스케줄러와 무엇이 다른지, 왜 Pod가 아니라 Job 단위로 막는지 — 그리고 imagekit 빌드에는
+        무슨 의미인지
+      </div>
+
+      <div class="card tldr">
+        <b>3줄 요약</b>
+        <ol style="margin: 10px 0 0; padding-left: 18px">
+          <li>스케줄러는 <b>"Pod를 어느 노드에"</b> 놓는다. Kueue는 <b>"이 작업을 *지금* 돌려도 되나"</b>를 정한다 — 다른 층이다.</li>
+          <li>그 판단은 <b>Pod가 생기기 전에 · 작업(Job) 통째로</b> 내려야 해서, Job을 <span class="pill pill-sus">suspend</span> 시켜 두는 admission 방식을 쓴다.</li>
+          <li>이 방식의 최대 이유는 <b>여러 Pod를 한꺼번에 띄워야 하는 작업(gang)</b> 때문 — 그런데 <b>Kaniko 빌드는 Pod 1개</b>라 그 이득이 거의 없다.</li>
+        </ol>
+      </div>
+
+      <h2>1. 먼저 — 쿠버네티스에서 작업이 도는 3개의 층</h2>
+      <p>
+        "작업을 돌린다"는 건 사실 세 단계를 거친다. Kueue와 스케줄러(coaster 포함)는 <b>서로 다른 단계</b>를
+        담당한다.
+      </p>
+
+      <div class="layers">
+        <div class="layer lyr-admission">
+          <span class="tag">① Admission</span>
+          <div class="body">
+            <div class="t">이 작업을 지금 시작해도 되는가? — <span class="muted">Kueue</span></div>
+            <div class="d">쿼터·순번을 보고 "허락(admit)"이 날 때까지 작업을 대기시킨다. 허락 전엔 Pod를 아예 안 만든다.</div>
+          </div>
+        </div>
+        <div class="arrow-down">▼ 허락되면</div>
+        <div class="layer lyr-sched">
+          <span class="tag">② Scheduling</span>
+          <div class="body">
+            <div class="t">이 Pod를 어느 노드에 놓을까? — <span class="muted">kube-scheduler / coaster</span></div>
+            <div class="d">이미 만들어진 Pod를 적당한 노드에 배치(binding)한다.</div>
+          </div>
+        </div>
+        <div class="arrow-down">▼ 배치되면</div>
+        <div class="layer lyr-run">
+          <span class="tag">③ Running</span>
+          <div class="body">
+            <div class="t">컨테이너 실행</div>
+            <div class="d">kubelet이 노드에서 컨테이너를 띄운다.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="callout">
+        <b>핵심:</b> Kueue는 ②를 대체하지 않는다. ①에서 "출발 허락"만 내주고, 실제 배치는 기존
+        스케줄러가 그대로 한다. <span class="muted">그래서 AIPub의 자체 스케줄러 <b>coaster</b>와도 충돌 없이 공존할 수 있다 — 둘은 담당 층이 다르다.</span>
+      </div>
+
+      <h2>2. 그럼 왜 ②(스케줄러)에서 쿼터를 막지 않고, 굳이 ①에서 막을까?</h2>
+      <p>스케줄러는 본질적으로 <b>Pod를 하나씩</b> 처리한다. 쿼터/동시성 제한을 Pod 층에서 하려 하면 문제가 생긴다.</p>
+
+      <div class="cols">
+        <div class="col bad">
+          <h4>✗ Pod 층에서 막을 때 <span class="badge b-red">문제</span></h4>
+          <p style="margin-top: 4px">쿼터 초과인데도 Pod는 일단 만들어지고 →</p>
+          <ul style="margin: 8px 0; padding-left: 18px; font-size: 14px">
+            <li>노드에 못 붙고 <b>Pending</b>으로 계속 쌓임</li>
+            <li>큰 작업 2개가 자원을 <b>절반씩</b> 잡고 서로 못 끝냄 (교착)</li>
+            <li>만들었다 쫓겨나는 낭비 반복</li>
+          </ul>
+        </div>
+        <div class="col good">
+          <h4>✓ Job 층(admission)에서 막을 때 <span class="badge b-green">해결</span></h4>
+          <p style="margin-top: 4px">허락 전엔 <b>Pod를 0개</b>로 유지 →</p>
+          <ul style="margin: 8px 0; padding-left: 18px; font-size: 14px">
+            <li>큐에 <b>깔끔하게 대기</b> (클러스터에 부담 0)</li>
+            <li>"전체 몫이 확보될 때만" 한꺼번에 출발</li>
+            <li>스케줄러 사이클·자원 낭비 없음</li>
+          </ul>
+        </div>
+      </div>
+
+      <h2>3. 가장 큰 이유: "다 떠야 의미 있는 작업"(gang)</h2>
+      <p>
+        Kueue가 admission을 쓰는 결정적 동기다. 분산 학습처럼 <b>Pod 4개가 동시에 다 떠야</b> 한 작업이
+        진행되는 경우를 보자. 노드에 4개 슬롯이 있고, 작업 A·B 둘 다 4개씩 필요하다.
+      </p>
+
+      <div class="cols">
+        <div class="col bad">
+          <h4>✗ 스케줄러가 Pod 단위로 배치 <span class="badge b-red">교착</span></h4>
+          <div class="node">
+            <div class="nlabel">노드 (슬롯 4개)</div>
+            <div class="pods">
+              <span class="pod a">A-1</span>
+              <span class="pod a">A-2</span>
+              <span class="pod b">B-1</span>
+              <span class="pod b">B-2</span>
+            </div>
+          </div>
+          <p style="font-size: 13.5px; margin-top: 10px" class="muted">
+            A는 A-3·A-4 자리를 못 얻고, B도 B-3·B-4를 못 얻는다. 둘 다 절반만 떠서
+            <b style="color: #ff9a9a">영원히 시작 못 함</b>. 서로 자리를 안 비켜줘서 데드락.
+          </p>
+        </div>
+        <div class="col good">
+          <h4>✓ Kueue가 작업 통째로 admit <span class="badge b-green">정상</span></h4>
+          <div class="node">
+            <div class="nlabel">노드 (슬롯 4개)</div>
+            <div class="pods">
+              <span class="pod a">A-1</span>
+              <span class="pod a">A-2</span>
+              <span class="pod a">A-3</span>
+              <span class="pod a">A-4</span>
+            </div>
+          </div>
+          <p style="font-size: 13.5px; margin-top: 10px" class="muted">
+            "A 전체 몫(4개)이 있나?" → 있음 → A만 admit해서 4개 한꺼번에 실행. B는
+            <span class="pill pill-sus">suspend</span> 상태로 큐에서 대기 → A 끝나면 출발.
+          </p>
+        </div>
+      </div>
+
+      <h2>4. admission을 쓰는 4가지 이유 정리</h2>
+
+      <div class="reason">
+        <div class="num">1</div>
+        <div>
+          <div class="rt">Pod를 만들기 전에 막는다</div>
+          <div class="rd">쿼터 초과면 Pod 자체를 0개로 둬서 Pending·낭비를 원천 차단.</div>
+        </div>
+      </div>
+      <div class="reason">
+        <div class="num">2</div>
+        <div>
+          <div class="rt">all-or-nothing(gang) 보장</div>
+          <div class="rd">여러 Pod 작업을 "전체 몫이 확보될 때만" 출발 → 부분 점유·교착 방지. (3장)</div>
+        </div>
+      </div>
+      <div class="reason">
+        <div class="num">3</div>
+        <div>
+          <div class="rt">스케줄러와 분리 — 아무 스케줄러나 같이 씀</div>
+          <div class="rd">배치는 기존 스케줄러(coaster 등)에 맡기고, Kueue는 "출발 허락"만. 바인딩 로직을 재발명하지 않음.</div>
+        </div>
+      </div>
+      <div class="reason">
+        <div class="num">4</div>
+        <div>
+          <div class="rt">쿼터·순번·공정성·선점은 "작업 단위 정책"</div>
+          <div class="rd">"조직 쿼터 안에서 다음에 뭘 돌릴까, 빌려줄까, 누굴 선점할까"는 Pod가 아니라 Job 단위로 표현하는 게 자연스러움.</div>
+        </div>
+      </div>
+
+      <h2>5. 메커니즘 — 실제로 어떻게 막나</h2>
+      <p>
+        쿠버네티스 <code>batch/v1 Job</code>에는 <code>spec.suspend</code>라는 스위치가 있다.
+        <b>suspend=true면 Pod가 안 만들어진다.</b> Kueue는 이 스위치를 쥐고 흔든다.
+      </p>
+
+      <div class="flow">
+        <div class="step">
+          <div class="s">생성 시</div>
+          <div class="v">Job을 <span class="pill pill-sus">suspend=true</span>로 생성 → Pod 0개</div>
+        </div>
+        <div class="chev">›</div>
+        <div class="step">
+          <div class="s">Kueue 판단</div>
+          <div class="v">Workload 객체 생성 → ClusterQueue <b>쿼터와 대조</b></div>
+        </div>
+        <div class="chev">›</div>
+        <div class="step">
+          <div class="s">admit</div>
+          <div class="v">자리 있으면 <span class="pill pill-run">suspend=false</span> → Pod 생성·실행</div>
+        </div>
+        <div class="chev">›</div>
+        <div class="step">
+          <div class="s">선점(옵션)</div>
+          <div class="v">우선순위 높은 작업 오면 다시 <span class="pill pill-sus">suspend</span></div>
+        </div>
+      </div>
+
+      <p class="muted" style="font-size: 14px">
+        구성요소: <code>ResourceFlavor</code>(노드 종류) · <code>ClusterQueue</code>(쿼터의 실체) ·
+        <code>LocalQueue</code>(namespace별 입구) · <code>Workload</code>(작업의 자원 요구 표현). 모두
+        쿠버네티스 CRD라 <span class="kbd">kubectl</span>·API로 읽고 고칠 수 있다.
+      </p>
+
+      <h2>6. 그래서 imagekit 빌드에는?</h2>
+      <p>
+        Kueue admission 모델의 <b>최대 정당화는 ③장의 gang(다중 Pod)</b>이다. 그런데
+        <b>Kaniko 빌드는 Pod 1개짜리 Job</b>이다. → gang 이득이 사실상 없고, 남는 건
+        <b>"쿼터 + 큐"</b> 둘뿐이다.
+      </p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Kueue가 주는 것</th>
+            <th>단일 Pod 빌드에서</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>gang(전체 동시 admit)</td>
+            <td class="no">불필요 — Pod 1개</td>
+          </tr>
+          <tr>
+            <td>동시 실행 수 제한 (쿼터)</td>
+            <td class="ok">필요 — 하지만 컨트롤러에서도 카운트로 가능</td>
+          </tr>
+          <tr>
+            <td>대기 큐(FIFO)</td>
+            <td class="ok">필요 — 하지만 컨트롤러 reconcile로도 가능</td>
+          </tr>
+          <tr>
+            <td>공정 분배·borrowing·선점</td>
+            <td class="muted">있으면 좋지만 빌드엔 과함</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="callout warn">
+        <b>결론:</b> AIPub은 자체 스케줄러 <b>coaster</b>를 쓰고 Kueue는 미설치 상태다. 단일 Pod 빌드의
+        "동시 빌드 수 제한 + 큐"가 목표라면, gang을 위한 admission 인프라(Kueue)를 새로 까는 것보다
+        <b>ImageBuild 컨트롤러에서 직접 큐를 거는 방식(DIY)</b>이 더 가볍고 imagekit가 온전히
+        소유한다. <span class="muted">관리자 UI로 한도를 바꾸는 요구사항도 imagekit 소유 설정에 저장하면 cluster-scoped 권한·플랫폼 조율 없이 깔끔하게 반영된다.</span>
+        향후 멀티-Pod 분산 학습까지 통합 쿼터로 묶을 일이 생기면 그때 Kueue가 제값을 한다.
+      </div>
+
+      <div class="footer">
+        ImageKit · Kueue admission 개념 설명 · 빌드 동시성/큐 설계 논의용 (코드 변경 없음)
+      </div>
+    </div>
+  </body>
+</html>

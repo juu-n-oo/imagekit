@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Dockerizer — PVC 마운트 아키텍처</title><link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css'><style>
+<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>ImageKit — PVC 마운트 아키텍처</title><link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css'><style>
 :root{--accent:#1d63ed;--accent2:#16b1ff;--accent-soft:#e9f0fe;--ink:#161d2b;--muted:#5d6878;
 --border:#e4e8ef;--bg:#eceff5;--green:#0f7a50;--green-soft:#e6f6ee;--amber:#9a5a08;--red:#d43b3b;}
 *{box-sizing:border-box;}html{scroll-behavior:smooth;}
@@ -34,7 +34,7 @@ tbody tr:last-child td{border-bottom:none;}tbody tr:hover td{background:#f8faff;
 </style></head><body>
 <div class="wrap"><div class="card">
 
-<p class="eyebrow">Dockerizer Architecture</p>
+<p class="eyebrow">ImageKit Architecture</p>
 <h1>PVC 마운트 아키텍처</h1>
 <p>AIPubVolume PVC가 파일 브라우저(Browse API)와 Kaniko 빌드 Pod에서 각각 어떻게 마운트되고, 경로가 어떻게 매핑되는지를 정리한 문서이다.</p>
 <p><strong>최종 갱신:</strong> 2026-06-04</p>
@@ -42,7 +42,7 @@ tbody tr:last-child td{border-bottom:none;}tbody tr:hover td{background:#f8faff;
 <hr>
 
 <h2>1. 개요</h2>
-<p>Dockerizer의 COPY(Volume) 기능은 사용자의 <strong>AIPubVolume</strong>(PVC)에 있는 파일을 Kaniko 빌드 시 빌드 컨텍스트로 전달한다. 이 과정에서 <strong>세 군데의 Pod/컨테이너</strong>가 동일한 PVC를 서로 다른 경로에 마운트하므로, 경로 정규화 전략이 핵심이다.</p>
+<p>ImageKit의 COPY(Volume) 기능은 사용자의 <strong>AIPubVolume</strong>(PVC)에 있는 파일을 Kaniko 빌드 시 빌드 컨텍스트로 전달한다. 이 과정에서 <strong>세 군데의 Pod/컨테이너</strong>가 동일한 PVC를 서로 다른 경로에 마운트하므로, 경로 정규화 전략이 핵심이다.</p>
 
 <figure style="margin:1.8em 0;">
 <img src="pvc-mount-architecture.svg" alt="AIPub Volume PVC, AIPubVolume Pod(/data), Kaniko Pod(/build-context), Dockerfile COPY 경로 매핑 다이어그램" style="width:100%;max-width:1100px;display:block;margin:0 auto;border:1px solid var(--border);border-radius:14px;background:#fff;"/>
@@ -146,7 +146,7 @@ tbody tr:last-child td{border-bottom:none;}tbody tr:hover td{background:#f8faff;
 <p>AIPubVolume Pod의 마운트 경로(<code>/data</code>)는 <strong>Pod의 구현 상세</strong>이지 PVC 내부 구조가 아니다. Browse API는 이 마운트 경로를 숨기고, 사용자에게는 PVC 루트를 <code>/</code>로 보여준다. 이를 통해 <strong>어떤 Pod에서 마운트하든 동일한 경로 체계</strong>를 사용할 수 있다.</p>
 
 <div class="note">
-<p><strong>설정:</strong> <code>dockerizer.volume.pvc-mount-path</code> (기본값: <code>/data</code>)<br>
+<p><strong>설정:</strong> <code>imagekit.volume.pvc-mount-path</code> (기본값: <code>/data</code>)<br>
 AIPubVolume Pod 내 PVC 마운트 경로. Browse API가 이 경로를 PVC 루트(<code>/</code>)로 취급한다. AIPub 플랫폼의 컨벤션이 변경되면 이 설정만 수정하면 된다.</p>
 </div>
 
@@ -171,12 +171,12 @@ AIPubVolume Pod 내 PVC 마운트 경로. Browse API가 이 경로를 PVC 루트
 <div class="tablewrap"><table>
 <thead><tr><th>역할</th><th>파일</th></tr></thead>
 <tbody>
-<tr><td>PVC mount path 설정</td><td><code>dockerizer-backend-server/.../volume/client/VolumeProperties.java</code></td></tr>
-<tr><td>Browse API (경로 정규화)</td><td><code>dockerizer-backend-server/.../volume/service/VolumeBrowserService.java</code></td></tr>
+<tr><td>PVC mount path 설정</td><td><code>imagekit-backend-server/.../volume/client/VolumeProperties.java</code></td></tr>
+<tr><td>Browse API (경로 정규화)</td><td><code>imagekit-backend-server/.../volume/service/VolumeBrowserService.java</code></td></tr>
 <tr><td>Kaniko Job 생성 (마운트 구성)</td><td><code>imagebuild-controller/.../reconciler/KanikoJobFactory.java</code></td></tr>
-<tr><td>Dockerfile COPY 생성 (프론트)</td><td><code>dockerizer-web/src/pages/dockerfile/DockerfileEditorPage.tsx</code></td></tr>
+<tr><td>Dockerfile COPY 생성 (프론트)</td><td><code>imagekit-web/src/pages/dockerfile/DockerfileEditorPage.tsx</code></td></tr>
 <tr><td>CRD 스키마 (buildContextPvc)</td><td><code>helm/imagebuild-controller/templates/crd.yaml</code></td></tr>
-<tr><td>설정 파일</td><td><code>dockerizer-backend-server/src/main/resources/application.yaml</code></td></tr>
+<tr><td>설정 파일</td><td><code>imagekit-backend-server/src/main/resources/application.yaml</code></td></tr>
 </tbody>
 </table></div>
 
@@ -209,7 +209,7 @@ AIPubVolume Pod 내 PVC 마운트 경로. Browse API가 이 경로를 PVC 루트
           mountPath: /kaniko/.docker</code></pre>
 
 <hr>
-<p style="font-size:.85rem;color:var(--muted);text-align:center;">Dockerizer — PVC Mount Architecture &copy; AIPub, TEN Inc.</p>
+<p style="font-size:.85rem;color:var(--muted);text-align:center;">ImageKit — PVC Mount Architecture &copy; AIPub, TEN Inc.</p>
 
 </div></div>
 </body></html>

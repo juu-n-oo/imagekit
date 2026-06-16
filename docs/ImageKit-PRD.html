@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Dockerizer PRD — Beta (AIPub 4.8.0)</title><link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css'><style>
+<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>ImageKit PRD — Beta (AIPub 4.8.0)</title><link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css'><style>
 :root{--accent:#1d63ed;--accent2:#16b1ff;--accent-soft:#e9f0fe;--ink:#161d2b;--muted:#5d6878;
 --border:#e4e8ef;--bg:#eceff5;--green:#0f7a50;--green-soft:#e6f6ee;--amber:#9a5a08;}
 *{box-sizing:border-box;}html{scroll-behavior:smooth;}
@@ -57,9 +57,9 @@ li.ac ul{margin:.2em 0 0;padding-left:0;}li.ac ul li{list-style:none;margin:.32e
 .foot{text-align:center;color:var(--muted);font-size:.78rem;margin-top:30px;}
 @media(max-width:640px){.card{padding:30px 20px;border-radius:14px;}h1{font-size:1.7rem;}.wrap{padding:28px 14px 80px;}}
 @media print{body{background:#fff;font-size:11pt;}.wrap{padding:0;max-width:none;}.card{border:none;box-shadow:none;border-radius:0;padding:0;}.card::before{display:none;}.tablewrap,.mermaid{overflow:visible;}a{border:none;}}
-</style></head><body><div class='wrap'><article class='card'><div class='eyebrow'>Product Requirements Document</div><h1>Dockerizer PRD — Beta (AIPub 4.8.0)</h1>
+</style></head><body><div class='wrap'><article class='card'><div class='eyebrow'>Product Requirements Document</div><h1>ImageKit PRD — Beta (AIPub 4.8.0)</h1>
 <blockquote>
-<p><strong>핵심 가치 (One-liner):</strong> Dockerizer는 고객이 다루는 <strong>'이미지'라는 자산의 생성·관리·재사용 효율을 높이기 위해</strong>, Dockerfile 작성부터 빌드·ImageHub 푸시·재활용까지 전 과정을 브라우저 안에서 끝낼 수 있게 한다.</p>
+<p><strong>핵심 가치 (One-liner):</strong> ImageKit는 고객이 다루는 <strong>'이미지'라는 자산의 생성·관리·재사용 효율을 높이기 위해</strong>, Dockerfile 작성부터 빌드·ImageHub 푸시·재활용까지 전 과정을 브라우저 안에서 끝낼 수 있게 한다.</p>
 </blockquote>
 <div class="tablewrap"><table class="meta">
 <thead>
@@ -71,7 +71,7 @@ li.ac ul{margin:.2em 0 0;padding-left:0;}li.ac ul li{list-style:none;margin:.32e
 <tbody>
 <tr>
 <td>문서</td>
-<td>Dockerizer 제품 요구사항 정의서 (PRD)</td>
+<td>ImageKit 제품 요구사항 정의서 (PRD)</td>
 </tr>
 <tr>
 <td>범위</td>
@@ -83,7 +83,7 @@ li.ac ul{margin:.2em 0 0;padding-left:0;}li.ac ul li{list-style:none;margin:.32e
 </tr>
 <tr>
 <td>갱신</td>
-<td>2026-06-05 — Dockerfile 버전관리 In-Scope·AC 반영, 구현 결정 사항(10절) 신설, Volume 웹 업로드 제한 및 SFTPServer 재설계 Open Question 추가, 시스템 개요 다이어그램 Dockerizer 표기 정정, 외부 레지스트리(NGC/Hugging Face) → Image Catalog 전환<br>2026-06-10 — 이미지 메타데이터 라벨을 사용자 입력(Dockerfile 기록)·빌드 시 자동으로 분리 적용, 입력 위치를 빌드 다이얼로그→에디터로 이동, Dockerfile 이름 중복 방지 추가; 10절(구현 결정 사항) 요약·OCI 라벨 설명 추가, 절 참조 표기 통일(§→절), 개발/QA 일정 명시<br>2026-06-11 — Image Catalog 프론트 연동 완료(<code>/image-catalog/api/images</code>·<code>/images/{name}</code> 조회 → base 이미지 선택 다이얼로그 기본 탭), "AIPub 제공 예정" → "제공" 표기 갱신</td>
+<td>2026-06-05 — Dockerfile 버전관리 In-Scope·AC 반영, 구현 결정 사항(10절) 신설, Volume 웹 업로드 제한 및 SFTPServer 재설계 Open Question 추가, 시스템 개요 다이어그램 ImageKit 표기 정정, 외부 레지스트리(NGC/Hugging Face) → Image Catalog 전환<br>2026-06-10 — 이미지 메타데이터 라벨을 사용자 입력(Dockerfile 기록)·빌드 시 자동으로 분리 적용, 입력 위치를 빌드 다이얼로그→에디터로 이동, Dockerfile 이름 중복 방지 추가; 10절(구현 결정 사항) 요약·OCI 라벨 설명 추가, 절 참조 표기 통일(§→절), 개발/QA 일정 명시<br>2026-06-11 — Image Catalog 프론트 연동 완료(<code>/image-catalog/api/images</code>·<code>/images/{name}</code> 조회 → base 이미지 선택 다이얼로그 기본 탭), "AIPub 제공 예정" → "제공" 표기 갱신</td>
 </tr>
 <tr>
 <td>일정</td>
@@ -146,7 +146,7 @@ li.ac ul{margin:.2em 0 0;padding-left:0;}li.ac ul li{list-style:none;margin:.32e
 </tbody>
 </table></div>
 <h2>3. 목표 (Goals)</h2>
-<p><strong>핵심 목표 (Beta):</strong> AIPub 4.8.0 Beta 출시 시점에, 사용자가 <strong>Dockerizer로 이미지를 빌드</strong>하고 그 <strong>이미지로 워크로드(Workspace · Operation 등)를 정상적으로 구동</strong>할 수 있음을 입증한다.</p>
+<p><strong>핵심 목표 (Beta):</strong> AIPub 4.8.0 Beta 출시 시점에, 사용자가 <strong>ImageKit로 이미지를 빌드</strong>하고 그 <strong>이미지로 워크로드(Workspace · Operation 등)를 정상적으로 구동</strong>할 수 있음을 입증한다.</p>
 <p><strong>정성 목표:</strong>
 - 고객의 '이미지' 자산을 생성·관리·재사용하는 <strong>효율을 높인다.</strong>
 - 로컬 환경 없이 <strong>브라우저만으로 이미지 빌드</strong>가 가능함을 입증한다.
@@ -245,7 +245,7 @@ li.ac ul{margin:.2em 0 0;padding-left:0;}li.ac ul li{list-style:none;margin:.32e
 <li><strong class="gwt w">When</strong> 그 Project의 Dockerfile·빌드·이미지에 접근을 시도하면</li>
 <li><strong class="gwt t">Then</strong> 접근이 거부된다.</li>
 <li class="ac star"><strong>AC-8 (워크로드 정상 구동 — ★ 핵심 목표)</strong></li>
-<li><strong class="gwt g">Given</strong> Dockerizer로 빌드·push된 이미지를</li>
+<li><strong class="gwt g">Given</strong> ImageKit로 빌드·push된 이미지를</li>
 <li><strong class="gwt w">When</strong> AIPub 워크로드(Workspace · Operation 등)에서 사용하면</li>
 <li><strong class="gwt t">Then</strong> 정상적으로 pull·구동된다.</li>
 <li class="ac"><strong>AC-9 (Dockerfile 버전관리 — 리비전 / Diff / 롤백)</strong></li>
@@ -266,31 +266,31 @@ li.ac ul{margin:.2em 0 0;padding-left:0;}li.ac ul li{list-style:none;margin:.32e
 <div class="mermaid">
 flowchart LR
   AIPub[AIPub] --> ImageHub[ImageHub]
-  ImageHub -->|base image| Dockerizer[Dockerizer]
-  Dockerizer --> DfMgmt[Dockerfile Management]
-  Dockerizer --> ImageBuild[ImageBuild]
+  ImageHub -->|base image| ImageKit[ImageKit]
+  ImageKit --> DfMgmt[Dockerfile Management]
+  ImageKit --> ImageBuild[ImageBuild]
   ImageBuild -->|push| ImageHub
   ImageBuild -.->|push| ExtReg[External registry]
   Controller[ImageBuild Controller] -.->|watch| ImageBuild
   Controller -->|create / trigger| Job[Kubernetes Job]
   Job --> Volume[AIPub Volume]
-  Linux[Linux Packages] -.-> Dockerizer
-  Python[Python Packages] -.-> Dockerizer
-  Catalog[Image Catalog] -.->|base image| Dockerizer
+  Linux[Linux Packages] -.-> ImageKit
+  Python[Python Packages] -.-> ImageKit
+  Catalog[Image Catalog] -.->|base image| ImageKit
 
   classDef plat fill:#1f8fff,stroke:#1565c0,color:#fff;
   classDef hub fill:#ffb763,stroke:#e08a2e,color:#3a2400;
   classDef k8s fill:#ff7a6b,stroke:#e0483a,color:#3a0a06;
   classDef ext fill:#7a7f87,stroke:#565b62,color:#fff;
   classDef svc fill:#86c5ff,stroke:#3a8fd0,color:#08233f;
-  class AIPub,Dockerizer plat;
+  class AIPub,ImageKit plat;
   class ImageHub hub;
   class ImageBuild,Controller,Job,Volume k8s;
   class ExtReg,Linux,Python,Catalog ext;
   class DfMgmt svc;
 </div>
 <blockquote>
-<p>다이어그램의 <strong>Dockerizer</strong> 노드 = 본 서비스(Dockerfile 관리 + ImageBuild 빌드). 점선(<code>-.-&gt;</code>)은 watch/외부 소스·레지스트리 연동, 실선은 주 빌드 흐름.</p>
+<p>다이어그램의 <strong>ImageKit</strong> 노드 = 본 서비스(Dockerfile 관리 + ImageBuild 빌드). 점선(<code>-.-&gt;</code>)은 watch/외부 소스·레지스트리 연동, 실선은 주 빌드 흐름.</p>
 </blockquote>
 <h3>구성요소</h3>
 <div class="tablewrap"><table>
@@ -302,7 +302,7 @@ flowchart LR
 </thead>
 <tbody>
 <tr>
-<td><strong>dockerizer-web</strong></td>
+<td><strong>imagekit-web</strong></td>
 <td>Dockerfile 에디터, base 이미지 선택, 빌드 트리거, 결과/로그 조회 UI</td>
 </tr>
 <tr>
@@ -348,12 +348,12 @@ flowchart LR
 <p>이미지 <strong>라벨(label)</strong>은 이미지에 붙이는 <code>키=값</code> 형태의 메타데이터다. <strong>OCI(Open Container Initiative)</strong>는 컨테이너 이미지 표준을 정하는 단체로, 자주 쓰는 메타데이터 키를 <code>org.opencontainers.image.*</code> 형태로 표준화해 여러 도구·레지스트리가 같은 의미로 인식하도록 했다. Harbor 이미지 상세의 "Labels"에 보이는 값이 이것이다.</p>
 <ul>
 <li><strong>대표적인 OCI 표준 라벨</strong>: <code>title</code>(이름) · <code>version</code>(버전) · <code>authors</code>(작성자) · <code>licenses</code>(라이선스) · <code>url</code>·<code>documentation</code>·<code>source</code>(관련 링크) · <code>description</code>(설명) · <code>created</code>(생성 시각) · <code>revision</code>(소스 리비전) · <code>vendor</code>(공급자) · <code>base.name</code>(베이스 이미지) 등.</li>
-<li><strong>Dockerizer가 사용하는 라벨</strong>
+<li><strong>ImageKit가 사용하는 라벨</strong>
 <ul>
 <li><em>사용자 입력 → Dockerfile에 기록</em>: <code>title</code>(Dockerfile 이름에서 자동) · <code>version</code>(빈 값이면 <code>latest</code>) · <code>authors</code>(기본=로그인 사용자) · <code>licenses</code> · <code>url</code> · <code>documentation</code> + 임의 커스텀 라벨.</li>
-<li><em>자동 주입 → 빌드 시</em>: <code>created</code> · <code>revision</code> · <code>vendor</code> · <code>base.name</code> · <code>description</code>, 그리고 Dockerizer 고유 출처 라벨(<code>aipub.ten1010.io/dockerfile-id</code>·<code>dockerfile-revision-id</code>·<code>username</code>).</li>
+<li><em>자동 주입 → 빌드 시</em>: <code>created</code> · <code>revision</code> · <code>vendor</code> · <code>base.name</code> · <code>description</code>, 그리고 ImageKit 고유 출처 라벨(<code>aipub.ten1010.io/dockerfile-id</code>·<code>dockerfile-revision-id</code>·<code>username</code>).</li>
 </ul></li>
-<li>이미지 보안 스캔(취약점·SBOM)은 Dockerizer가 직접 수행하지 않고, 필요 시 AIPub의 Harbor/Trivy 결과를 활용한다.</li>
+<li>이미지 보안 스캔(취약점·SBOM)은 ImageKit가 직접 수행하지 않고, 필요 시 AIPub의 Harbor/Trivy 결과를 활용한다.</li>
 </ul>
 </blockquote>
 <h3>제한 · 보류</h3>
@@ -373,8 +373,8 @@ flowchart LR
 <h2>12. 참고 문서</h2>
 <ul>
 <li>이미지 메타데이터 라벨 실제 빌드 예시 — <a href="image-label-example.html">image-label-example.html</a></li>
-<li>서비스 기획서 v0.1 — <code>dockerizer-web/CLAUDE.md</code>, <code>dockerizer-backend/CLAUDE.md</code></li>
-<li>백엔드 구조 — <code>dockerizer-backend/README.md</code></li>
-<li>실행계획 — <code>dockerizer-backend/docs/mvp-execution-plan.md</code>, <code>dockerizer-web/docs/mvp-execution-plan.md</code></li>
-<li>K8s 연동 — <code>dockerizer-backend/docs/kubernetes-integration.md</code>, <code>dockerizer-web/docs/k8s-backend-integration.md</code></li>
-</ul></article><div class='foot'>Dockerizer PRD · 렌더링 2026-06-10 · 원본 docs/PRD.md</div></div><script type='module'>import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';mermaid.initialize({startOnLoad:true,theme:'base',securityLevel:'loose',flowchart:{curve:'basis',htmlLabels:true},themeVariables:{fontFamily:'Pretendard Variable, Pretendard, sans-serif',fontSize:'14px'}});</script></body></html>
+<li>서비스 기획서 v0.1 — <code>imagekit-web/CLAUDE.md</code>, <code>imagekit-backend/CLAUDE.md</code></li>
+<li>백엔드 구조 — <code>imagekit-backend/README.md</code></li>
+<li>실행계획 — <code>imagekit-backend/docs/mvp-execution-plan.md</code>, <code>imagekit-web/docs/mvp-execution-plan.md</code></li>
+<li>K8s 연동 — <code>imagekit-backend/docs/kubernetes-integration.md</code>, <code>imagekit-web/docs/k8s-backend-integration.md</code></li>
+</ul></article><div class='foot'>ImageKit PRD · 렌더링 2026-06-10 · 원본 docs/PRD.md</div></div><script type='module'>import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';mermaid.initialize({startOnLoad:true,theme:'base',securityLevel:'loose',flowchart:{curve:'basis',htmlLabels:true},themeVariables:{fontFamily:'Pretendard Variable, Pretendard, sans-serif',fontSize:'14px'}});</script></body></html>

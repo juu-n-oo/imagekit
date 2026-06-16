@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>Dockerizer 코드 리팩토링 리뷰</title><link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css'><style>
+<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>ImageKit 코드 리팩토링 리뷰</title><link rel='stylesheet' href='https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.min.css'><style>
 :root{--accent:#1d63ed;--accent2:#16b1ff;--accent-soft:#e9f0fe;--ink:#161d2b;--muted:#5d6878;
 --border:#e4e8ef;--bg:#eceff5;--green:#0f7a50;--green-soft:#e6f6ee;--amber:#9a5a08;}
 *{box-sizing:border-box;}
@@ -44,10 +44,10 @@ ul.good li::before{content:"✓";position:absolute;left:.1em;color:var(--green);
 @media print{body{background:#fff;font-size:11pt;}.wrap{padding:0;max-width:none;}.card{border:none;box-shadow:none;border-radius:0;padding:0;}.card::before{display:none;}a{border:none;}}
 </style></head><body><div class='wrap'><article class='card'>
 <div class='eyebrow'>Refactoring Review</div>
-<h1>Dockerizer 코드 리팩토링 리뷰</h1>
+<h1>ImageKit 코드 리팩토링 리뷰</h1>
 <table class='meta'><tbody>
 <tr><th>작성일</th><td>2026-06-11</td></tr>
-<tr><th>대상</th><td><code>dockerizer-backend</code> (099c84a) · <code>dockerizer-web</code> (e569ad0)</td></tr>
+<tr><th>대상</th><td><code>imagekit-backend</code> (099c84a) · <code>imagekit-web</code> (e569ad0)</td></tr>
 <tr><th>범위</th><td>유지보수성 관점의 <b>리팩토링 포인트</b> (코드 스멜·중복·관심사 분리·타입 안전성·테스트)</td></tr>
 <tr><th>식별자</th><td><code>SRV-n</code> 백엔드 서버 · <code>CTL-n</code> ImageBuild 컨트롤러 · <code>WEB-n</code> 프론트엔드</td></tr>
 <tr><th>원본</th><td><a href='code-refactoring-review.md'>code-refactoring-review.md</a> (동일 내용)</td></tr>
@@ -78,7 +78,7 @@ ul.good li::before{content:"✓";position:absolute;left:.1em;color:var(--green);
 <li><b>테스트 공백</b> — 컨트롤러 모듈은 컨텍스트 로드 테스트 1개뿐, 서버 CR 매핑도 직접 테스트 없음. 가장 회귀 위험이 큰 코드가 미검증.</li>
 </ol>
 
-<h2>2. 백엔드 서버 (<code>dockerizer-backend-server</code>)</h2>
+<h2>2. 백엔드 서버 (<code>imagekit-backend-server</code>)</h2>
 
 <div class='finding h'><span class='t'><span class='sev h'>High</span> SRV-1 — 무타입 Map + Gson 왕복 파싱</span>
 <code>ImageBuildService</code> 의 <code>listBuilds</code>/<code>getCrMap</code> 이 <code>Object→Map&lt;String,Object&gt;</code> 로 캐스팅(unchecked 다수)하고, <code>crMapToResponse</code> 가 metadata/labels 를 손으로 파헤친 뒤 <code>parseStatus</code>/<code>parseSpec</code> 이 <code>gson.fromJson(gson.toJson(obj),…)</code> 로 이미 존재하는 타입 클래스에 재직렬화한다. 호출마다 이중 직렬화 + 흩어진 캐스트.
@@ -90,7 +90,7 @@ ul.good li::before{content:"✓";position:absolute;left:.1em;color:var(--green);
 
 <div class='finding h'><span class='t'><span class='sev ok'>부분완료</span> <span class='sev h'>High</span> SRV-3 — 모듈 간 CR 모델·상수 중복 (이미 drift)</span>
 서버·컨트롤러의 <code>ImageBuildConstants</code> 가 거의 동일, <code>ImageBuildSpec</code>/<code>ImageBuildStatus</code> 도 중복인데 <b>서버 <code>ImageBuildSpec</code> 엔 <code>imageLabels</code> 필드가 누락</b>. <code>K8sProperties</code> 는 두 모듈 바이트 단위 동일. 와이어 계약의 진실원본이 둘.
-<div class='rec'><b>권장</b> — <code>dockerizer-cr-model</code>/<code>dockerizer-common</code> Gradle 모듈로 CR 클래스·상수·<code>K8sProperties</code> 공유.</div>
+<div class='rec'><b>권장</b> — <code>imagekit-cr-model</code>/<code>imagekit-common</code> Gradle 모듈로 CR 클래스·상수·<code>K8sProperties</code> 공유.</div>
 <div class='rec'><b>✅ 완료(2026-06-11)</b> — 서버 <code>ImageBuildSpec</code> 에 누락됐던 <code>imageLabels</code> 필드 추가로 drift 해소. 공유 Gradle 모듈 추출은 향후 레포 분리 가능성으로 보류.</div></div>
 
 <div class='finding h'><span class='t'><span class='sev ok'>완료</span> <span class='sev h'>High</span> SRV-4 — GlobalExceptionHandler 일반 fallback 부재 + 원문 노출</span>
@@ -182,7 +182,7 @@ apiVersion/kind/policy(<code>"v1"</code>,<code>"ConfigMap"</code>,<code>"batch/v
 <code>ControllerProperties</code> 가 모두 boxed + 기본값인데 언박싱 사용(<code>resyncPeriodSeconds * 1000L</code> 등). YAML 빈 값 시 null → 시작 NPE.
 <div class='rec'><b>권장</b> — primitive <code>int</code>/<code>boolean</code> 필드 + 기본값(Spring 바인딩 정상).</div></div>
 
-<h2>4. 프론트엔드 (<code>dockerizer-web</code>)</h2>
+<h2>4. 프론트엔드 (<code>imagekit-web</code>)</h2>
 
 <div class='finding h'><span class='t'><span class='sev ok'>완료</span> <span class='sev h'>High</span> WEB-1 — DockerfileEditorPage.tsx 1,891줄 god-component</span>
 순수 헬퍼(<code>parseDockerfileContent</code>/<code>generateDockerfileContent</code>/<code>buildLabelLines</code>)부터 <code>~20 useState + 7 useEffect</code>, 폼 제출, 빌드/저장 다이얼로그, 이미지 셀렉터, 두 개의 큰 중첩 JSX 다이얼로그까지 한 파일이 소유. 단위 테스트 불가 + 최고 churn 위험.
@@ -311,5 +311,5 @@ WEB-5 의 i18n 공백이 표시 문자열을 config 배열에 결합.
 </ul>
 <blockquote>인가/인증(SRV-13 및 아키텍처 리뷰 A·B 시리즈)은 기존 일정 결정에 따라 베타 기능 완료 후 횡단 관심사로 일괄 진행한다.</blockquote>
 
-<p class='foot'>Dockerizer 코드 리팩토링 리뷰 · 2026-06-11</p>
+<p class='foot'>ImageKit 코드 리팩토링 리뷰 · 2026-06-11</p>
 </article></div></body></html>

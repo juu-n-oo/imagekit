@@ -2,7 +2,7 @@
 
 > 작성일: 2026-06-05
 > 상태: 설계 검토 (미구현)
-> 관련 문서: [volume-build-context.html](volume-build-context.html), [dockerizer-backend/docs/enhancement-build-context.md](../dockerizer-backend/docs/enhancement-build-context.md)
+> 관련 문서: [volume-build-context.html](volume-build-context.html), [imagekit-backend/docs/enhancement-build-context.md](../imagekit-backend/docs/enhancement-build-context.md)
 
 ---
 

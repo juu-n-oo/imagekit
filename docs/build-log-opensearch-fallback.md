@@ -5,8 +5,8 @@
 > 관련: [volume-build-context.html](volume-build-context.html), 메모리 `project-monitoring-logging-stack`
 
 > ## ✅ 구현 완료 요약 (2026-06-09)
-> - **백엔드**(`dockerizer-backend`): `OpenSearchProperties`/`OpenSearchConfiguration`/`OpenSearchBuildLogClient`(신규) + `ImageBuildService.getBuildLogs` 에 `ObjectProvider<OpenSearchBuildLogClient>` fallback. **0건이면 `ResourceNotFoundException`→404** 계약. dev/prod yaml, Helm(values/env-configmap/env-secret), install.sh(시크릿 복제 + `--set`/`--set-json` CA 마운트) 반영. opensearch-java **3.0.0**(httpclient5 5.5.x via Spring Boot 4 BOM). `compileJava` BUILD SUCCESSFUL, `helm template` 정상.
-> - **프론트**(`dockerizer-web`): `BuildDetailPage` 로그 박스 3-state(404 → "로그를 확인할 수 없습니다") + `useBuildLogs` 가 404 시 폴링 중단. i18n `build.logUnavailable`(ko/en). `npm run build` 통과.
+> - **백엔드**(`imagekit-backend`): `OpenSearchProperties`/`OpenSearchConfiguration`/`OpenSearchBuildLogClient`(신규) + `ImageBuildService.getBuildLogs` 에 `ObjectProvider<OpenSearchBuildLogClient>` fallback. **0건이면 `ResourceNotFoundException`→404** 계약. dev/prod yaml, Helm(values/env-configmap/env-secret), install.sh(시크릿 복제 + `--set`/`--set-json` CA 마운트) 반영. opensearch-java **3.0.0**(httpclient5 5.5.x via Spring Boot 4 BOM). `compileJava` BUILD SUCCESSFUL, `helm template` 정상.
+> - **프론트**(`imagekit-web`): `BuildDetailPage` 로그 박스 3-state(404 → "로그를 확인할 수 없습니다") + `useBuildLogs` 가 404 시 폴링 중단. i18n `build.logUnavailable`(ko/en). `npm run build` 통과.
 > - **핵심 계약**: `GET /logs` 는 Pod OR OpenSearch 에 로그 있으면 200(text), 둘 다 없으면(Pod GC + (OS 비활성 OR 0건)) **404 `ProblemDetail`**. 프론트는 이 404 를 react-query `error` 로 탐지(응답 body 파싱 의존 X).
 > - **Helm 볼륨 결정**: 기본 values 엔 OpenSearch CA 볼륨 미포함(시크릿 부재 시 Pod 기동 실패 방지). install.sh 가 `OPENSEARCH_ENABLED=true` 일 때만 `--set-json` 으로 `opensearch-certs`→`/opensearch-certs` 마운트 주입.
 > - **PIT+search_after 페이지네이션 완료**(2026-06-09): 단발 `_search` 의 `max_result_window`(10,000) 상한을 넘겨 전체 로그 조회. PIT 스냅샷 + `[@timestamp asc, _shard_doc asc]` 정렬 + `search_after` 루프, `maxLines` 를 절대 상한(초과 시 truncated)으로, PIT 는 `finally` 에서 `deletePit`. 기본값(maxLines=10000)이면 한 페이지로 끝나 동작 변화 없음.
@@ -72,30 +72,30 @@ sort: [{ "@timestamp": "asc" }]
 ```
 opensearchJavaVersion=3.0.0   # OpenSearch 3.6 호환되는 3.x. Maven Central 최신 3.x 로 핀(빌드 시 확인)
 ```
-`dockerizer-backend-server/build.gradle`:
+`imagekit-backend-server/build.gradle`:
 ```gradle
 implementation "org.opensearch.client:opensearch-java:$opensearchJavaVersion"
 implementation 'org.apache.httpcomponents.client5:httpclient5'   // 버전은 Spring Boot 4 BOM 관리
 ```
-주의: opensearch-java 3.x 의 `ApacheHttpClient5TransportBuilder` + 비동기 HttpClient5 의 **TLS/credentials 와이어링이 까다로움**. 오프라인 컴파일 검증 불가하니, 작성 후 반드시 `./gradlew :dockerizer-backend-server:compileJava` (네트워크 필요) 로 확인할 것.
+주의: opensearch-java 3.x 의 `ApacheHttpClient5TransportBuilder` + 비동기 HttpClient5 의 **TLS/credentials 와이어링이 까다로움**. 오프라인 컴파일 검증 불가하니, 작성 후 반드시 `./gradlew :imagekit-backend-server:compileJava` (네트워크 필요) 로 확인할 것.
 
 ## 6. 설정 주입 패턴 (기존과 동일하게)
 
-- `applicationYaml.dockerizer.opensearch.*` → `env-configmap.yaml`(비밀 아님) + `env-secret.yaml`(password) 로 매핑 (Spring relaxed binding: `DOCKERIZER_OPENSEARCH_URL` → `dockerizer.opensearch.url`).
-- CA: 기존 `custom-ca-certs`→`/certificates` 마운트 선례 존재(values.yaml `volumes`/`volumeMounts`). OpenSearch CA 는 별도 시크릿(`dockerizer-backend-opensearch-certs`)으로 만들어 `/opensearch-certs/ca.crt` 에 마운트.
+- `applicationYaml.imagekit.opensearch.*` → `env-configmap.yaml`(비밀 아님) + `env-secret.yaml`(password) 로 매핑 (Spring relaxed binding: `IMAGEKIT_OPENSEARCH_URL` → `imagekit.opensearch.url`).
+- CA: 기존 `custom-ca-certs`→`/certificates` 마운트 선례 존재(values.yaml `volumes`/`volumeMounts`). OpenSearch CA 는 별도 시크릿(`imagekit-backend-opensearch-certs`)으로 만들어 `/opensearch-certs/ca.crt` 에 마운트.
 - 키 설계:
-  - configmap: `DOCKERIZER_OPENSEARCH_ENABLED`, `_URL`, `_INDEX_PATTERN`, `_VERIFY_SSL`, `_CA_CERT_PATH`, `_USERNAME`
-  - secret: `DOCKERIZER_OPENSEARCH_PASSWORD`
+  - configmap: `IMAGEKIT_OPENSEARCH_ENABLED`, `_URL`, `_INDEX_PATTERN`, `_VERIFY_SSL`, `_CA_CERT_PATH`, `_USERNAME`
+  - secret: `IMAGEKIT_OPENSEARCH_PASSWORD`
 
 ---
 
 ## 7. 구현 TODO (파일별 체크리스트)
 
-### 백엔드 코드 (`dockerizer-backend/dockerizer-backend-server`)
+### 백엔드 코드 (`imagekit-backend/imagekit-backend-server`)
 - [ ] `gradle.properties` — `opensearchJavaVersion` 추가
 - [ ] `build.gradle` — opensearch-java + httpclient5 의존성 추가
-- [ ] `common/config/OpenSearchProperties.java` — `@ConfigurationProperties("dockerizer.opensearch")`, `@Component` (K8sProperties 와 동일 방식). 필드: `enabled(기본 false)`, `url`, `username`, `password`, `indexPattern("kube-log-*")`, `verifySsl(true)`, `caCertPath`, `maxLines(10000)`
-- [ ] `common/config/OpenSearchConfiguration.java` — `@Bean OpenSearchClient`, `@ConditionalOnProperty("dockerizer.opensearch.enabled", havingValue="true")`. ApacheHttpClient5Transport + BasicCredentialsProvider(user/pass) + SSLContext(caCertPath 의 ca.crt 신뢰; verifySsl=false 면 trust-all) + `JacksonJsonpMapper`. HttpHost("https", host, 9200).
+- [ ] `common/config/OpenSearchProperties.java` — `@ConfigurationProperties("imagekit.opensearch")`, `@Component` (K8sProperties 와 동일 방식). 필드: `enabled(기본 false)`, `url`, `username`, `password`, `indexPattern("kube-log-*")`, `verifySsl(true)`, `caCertPath`, `maxLines(10000)`
+- [ ] `common/config/OpenSearchConfiguration.java` — `@Bean OpenSearchClient`, `@ConditionalOnProperty("imagekit.opensearch.enabled", havingValue="true")`. ApacheHttpClient5Transport + BasicCredentialsProvider(user/pass) + SSLContext(caCertPath 의 ca.crt 신뢰; verifySsl=false 면 trust-all) + `JacksonJsonpMapper`. HttpHost("https", host, 9200).
 - [ ] `imagebuild/service/OpenSearchBuildLogClient.java` — `String fetchPodLogs(String namespace, String crName)`. §3 쿼리로 `client.search(..., LogDoc.class)`, size=maxLines, `@timestamp asc`, `hits[].source.log` 를 `\n` join. `record LogDoc(String log)`. total>maxLines 면 끝에 "... (truncated, OpenSearch)" 표기 + `// TODO PIT+search_after 로 전체 페이지네이션`.
 - [ ] `imagebuild/service/ImageBuildService.java` — `getBuildLogs` 에 fallback:
   ```java
@@ -109,37 +109,37 @@ implementation 'org.apache.httpcomponents.client5:httpclient5'   // 버전은 Sp
   ```
   - 클라이언트는 비활성일 수 있으니 `ObjectProvider<OpenSearchBuildLogClient>` 로 주입 → 없으면 기존 404 유지.
   - (선택) `streamBuildLogs` 도 Pod 없으면 OpenSearch 결과를 한 번에 흘려보내고 done — 단 완료 빌드는 프론트가 폴링을 타므로 필수는 아님.
-- [ ] `application.yaml`(dev) — `dockerizer.opensearch.enabled: false` (로컬은 비활성)
-- [ ] `application-prod.yaml` — `dockerizer.opensearch` 블록 env 플레이스홀더(`${DOCKERIZER_OPENSEARCH_...}`)
+- [ ] `application.yaml`(dev) — `imagekit.opensearch.enabled: false` (로컬은 비활성)
+- [ ] `application-prod.yaml` — `imagekit.opensearch` 블록 env 플레이스홀더(`${IMAGEKIT_OPENSEARCH_...}`)
 
-### Helm (`dockerizer-backend/helm/dockerizer-backend`)
-- [ ] `values.yaml` — `applicationYaml.dockerizer.opensearch` 블록(enabled/url/indexPattern/verifySsl/caCertPath/username/password) + `volumes`/`volumeMounts` 에 `dockerizer-backend-opensearch-certs`→`/opensearch-certs` 추가
+### Helm (`imagekit-backend/helm/imagekit-backend`)
+- [ ] `values.yaml` — `applicationYaml.imagekit.opensearch` 블록(enabled/url/indexPattern/verifySsl/caCertPath/username/password) + `volumes`/`volumeMounts` 에 `imagekit-backend-opensearch-certs`→`/opensearch-certs` 추가
 - [ ] `templates/env-configmap.yaml` — opensearch enabled/url/indexPattern/verifySsl/caCertPath/username 키 추가
-- [ ] `templates/env-secret.yaml` — `DOCKERIZER_OPENSEARCH_PASSWORD` 추가
+- [ ] `templates/env-secret.yaml` — `IMAGEKIT_OPENSEARCH_PASSWORD` 추가
 - [ ] (deployment.yaml 은 volumes/volumeMounts 를 values 에서 toYaml 하므로 수정 불필요)
 
-### install.sh (`dockerizer-backend/scripts/install.sh`)
+### install.sh (`imagekit-backend/scripts/install.sh`)
 - [ ] "Retrieving secrets" 단계에 추가:
   - `OPENSEARCH_USERNAME`/`OPENSEARCH_PASSWORD` = `kubectl get secret -n aipub-monitoring opensearch-cluster-master-credentials` 에서 디코드
-  - `opensearch-cluster-master-certs` 의 `ca.crt` 디코드 → backend ns 에 `dockerizer-backend-opensearch-certs` 시크릿 생성:
+  - `opensearch-cluster-master-certs` 의 `ca.crt` 디코드 → backend ns 에 `imagekit-backend-opensearch-certs` 시크릿 생성:
     ```bash
     kubectl get secret -n aipub-monitoring opensearch-cluster-master-certs \
       -o jsonpath='{.data.ca\.crt}' | base64 -d > /tmp/os-ca.crt
-    kubectl create secret generic dockerizer-backend-opensearch-certs -n ${NAMESPACE} \
+    kubectl create secret generic imagekit-backend-opensearch-certs -n ${NAMESPACE} \
       --from-file=ca.crt=/tmp/os-ca.crt --dry-run=client -o yaml | kubectl apply -f -
     ```
   - (모니터링 ns/시크릿 이름은 config.json 으로 빼는 것도 고려)
-- [ ] `deploy_helm_chart "dockerizer-backend"` 의 `--set` 에 추가:
+- [ ] `deploy_helm_chart "imagekit-backend"` 의 `--set` 에 추가:
   ```
-  --set applicationYaml.dockerizer.opensearch.enabled=true
-  --set applicationYaml.dockerizer.opensearch.url=https://opensearch-cluster-master.aipub-monitoring:9200
-  --set applicationYaml.dockerizer.opensearch.username="${OPENSEARCH_USERNAME}"
-  --set applicationYaml.dockerizer.opensearch.password="${OPENSEARCH_PASSWORD}"
-  --set applicationYaml.dockerizer.opensearch.caCertPath=/opensearch-certs/ca.crt
+  --set applicationYaml.imagekit.opensearch.enabled=true
+  --set applicationYaml.imagekit.opensearch.url=https://opensearch-cluster-master.aipub-monitoring:9200
+  --set applicationYaml.imagekit.opensearch.username="${OPENSEARCH_USERNAME}"
+  --set applicationYaml.imagekit.opensearch.password="${OPENSEARCH_PASSWORD}"
+  --set applicationYaml.imagekit.opensearch.caCertPath=/opensearch-certs/ca.crt
   ```
 
 ### 검증
-- [ ] `./gradlew :dockerizer-backend-server:compileJava` (opensearch-java/httpclient5 다운로드 위해 네트워크 필요) — **transport/TLS 와이어링 컴파일 확인 필수**
+- [ ] `./gradlew :imagekit-backend-server:compileJava` (opensearch-java/httpclient5 다운로드 위해 네트워크 필요) — **transport/TLS 와이어링 컴파일 확인 필수**
 - [ ] 배포 후: 1시간 지나 Pod GC 된 빌드의 `/builds/{ns}/{name}/logs` 가 OpenSearch 에서 로그를 반환하는지 E2E 확인
 - [ ] 권한: 다른 프로젝트 빌드 로그가 새지 않는지(백엔드 권한 체크가 namespace 기준으로 동작하는지) 확인
 
@@ -156,8 +156,8 @@ implementation 'org.apache.httpcomponents.client5:httpclient5'   // 버전은 Sp
 
 ## 9. 참고 코드 위치
 
-- `dockerizer-backend-server/.../imagebuild/service/ImageBuildService.java` — `getBuildLogs`(143~), `streamBuildLogs`(156~), `findBuildPodName`(265~)
-- `dockerizer-backend-server/.../common/config/KubernetesConfiguration.java` / `K8sProperties.java` — `@ConfigurationProperties`/`@Bean` 패턴 참고
+- `imagekit-backend-server/.../imagebuild/service/ImageBuildService.java` — `getBuildLogs`(143~), `streamBuildLogs`(156~), `findBuildPodName`(265~)
+- `imagekit-backend-server/.../common/config/KubernetesConfiguration.java` / `K8sProperties.java` — `@ConfigurationProperties`/`@Bean` 패턴 참고
 - `imagebuild-controller/.../reconciler/KanikoJobFactory.java` — Job `ttlSecondsAfterFinished(3600)`, 라벨
-- `helm/dockerizer-backend/{values.yaml, templates/env-configmap.yaml, env-secret.yaml, deployment.yaml}`
-- `scripts/install.sh` — "Retrieving secrets" / `deploy_helm_chart "dockerizer-backend"`
+- `helm/imagekit-backend/{values.yaml, templates/env-configmap.yaml, env-secret.yaml, deployment.yaml}`
+- `scripts/install.sh` — "Retrieving secrets" / `deploy_helm_chart "imagekit-backend"`
