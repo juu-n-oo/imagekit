@@ -1,5 +1,10 @@
 {
   "permissions": {
     "defaultMode": "acceptEdits"
-  }
+  },
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "teammateMode": "tmux"
+  },
+  "teammateMode": "tmux"
 }

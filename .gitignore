@@ -5,6 +5,10 @@
 imagekit-web/
 imagekit-backend/
 
+# ten1010-io GitHub org 로 이전한 repo (imagekit-web / imagekit-backend / image-build-controller).
+# 각자 독립된 git repo 이므로 umbrella 의 추적 대상이 아니다.
+ten1010io/
+
 # macOS / IDE
 .DS_Store
 .idea/
