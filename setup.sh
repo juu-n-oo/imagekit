@@ -5,8 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
 REPOS=(
-  "imagekit-backend https://github.com/juu-n-oo/imagekit-backend.git"
-  "imagekit-web     https://github.com/juu-n-oo/imagekit-web.git"
+  "imagekit-backend       https://github.com/ten1010-io/imagekit-backend.git"
+  "imagekit-web           https://github.com/ten1010-io/imagekit-web.git"
+  "image-build-controller https://github.com/ten1010-io/image-build-controller.git"
 )
 
 for entry in "${REPOS[@]}"; do

@@ -11,14 +11,15 @@
 
 ## 2. 리포지토리 구조 (umbrella)
 
-이 디렉토리(`imagekit/`)는 **umbrella git repo** 다. 두 서브 프로젝트는 **각자 독립된 git repo** 이며, 같은 디렉토리 안에 clone 되어 있다.
+이 디렉토리(`imagekit/`)는 **umbrella git repo** 다. 세 서브 프로젝트는 **각자 독립된 git repo** 이며, 같은 디렉토리 안에 clone 되어 있다.
 
 | 디렉토리 | 역할 | 원격 |
 |---|---|---|
-| `imagekit-web` | 프론트엔드 (Dockerfile 에디터, 빌드 트리거, 로그/결과 조회 UI) | `juu-n-oo/imagekit-web` |
-| `imagekit-backend` | 백엔드 + ImageBuild 컨트롤러 (Dockerfile 저장, CR 생성, 빌드 상태/로그 제공) | `juu-n-oo/imagekit-backend` |
+| `imagekit-web` | 프론트엔드 (Dockerfile 에디터, 빌드 트리거, 로그/결과 조회 UI) | `ten1010-io/imagekit-web` |
+| `imagekit-backend` | 백엔드 (Dockerfile 저장, CR 생성, 빌드 상태/로그 제공) | `ten1010-io/imagekit-backend` |
+| `image-build-controller` | ImageBuild CR watch → Kaniko Job 관리 (k8s 컨트롤러) | `ten1010-io/image-build-controller` |
 
-- 두 서브 repo 는 본 umbrella 의 git 추적 대상이 **아니다** (`.gitignore` 로 제외). 각 repo 안에서 직접 commit / push 한다.
+- 세 서브 repo 는 본 umbrella 의 git 추적 대상이 **아니다** (`.gitignore` 로 제외). 각 repo 안에서 직접 commit / push 한다.
 - umbrella repo 는 양쪽 공통 정책(`CLAUDE.md`), 공유 도구(`.claude/`), 공통 문서를 보관한다.
 
 ## 3. AIPub 리브랜드 주의사항 (중요)
