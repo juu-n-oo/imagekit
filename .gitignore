@@ -1,13 +1,11 @@
 # imagekit umbrella repo .gitignore
 #
-# 서브 repo (imagekit-web / imagekit-backend) 는 각자 독립된 git repo 다.
-# 동일 디렉토리 안에 clone 하며, 이 umbrella 의 git 추적 대상이 아니다.
+# 서브 repo (imagekit-web / imagekit-backend / image-build-controller) 는 각자
+# 독립된 git repo 다 (ten1010-io GitHub org). 동일 디렉토리 안에 clone 하며,
+# 이 umbrella 의 git 추적 대상이 아니다.
 imagekit-web/
 imagekit-backend/
-
-# ten1010-io GitHub org 로 이전한 repo (imagekit-web / imagekit-backend / image-build-controller).
-# 각자 독립된 git repo 이므로 umbrella 의 추적 대상이 아니다.
-ten1010io/
+image-build-controller/
 
 # macOS / IDE
 .DS_Store
