@@ -180,15 +180,15 @@ flowchart LR
 
 | 구성요소 | 역할 |
 |---|---|
-| **imagekit-web** | Dockerfile 에디터, base 이미지 선택, 빌드 트리거, 결과/로그 조회 UI |
-| **backend-server** | Dockerfile CRUD, `ImageBuild` CR 생성, 상태/로그 조회 (REST API, Swagger) |
+| **imagekit-web** | Dockerfile 에디터, base 이미지 선택, 빌드 트리거(k8sproxy로 `ImageBuild` CR 직접 생성/조회/삭제/재빌드), 결과/로그 조회 UI |
+| **backend-server** | Dockerfile CRUD, 빌드 **로그** 조회(Pod 로그 + OpenSearch fallback), Volume·ImageHub 조회 (REST API, Swagger). **ImageBuild CR 생성/조회/삭제는 담당하지 않는다**(프론트가 k8sproxy로 직접 수행) |
 | **imagebuild-controller** | `ImageBuild` CR watch → Kaniko Pod/Job 생성·관리 → CR status 갱신 |
 | **Kaniko Job (Pod)** | 실제 이미지 빌드 및 ImageHub push |
 | **ImageHub (Harbor)** | Base 이미지 제공 + 빌드 산출물 저장 |
 | **Image Catalog** | AIPub 제공 — 검증된 읽기 전용 base 이미지 카탈로그(Harbor 전용 프로젝트). `/image-catalog/api` 로 프론트 연동 완료 |
 | **AIPub Volume** | 빌드 컨텍스트(코드·데이터) 소스 |
 
-**흐름:** 작성/저장 → `backend-server` 저장 → 빌드 Run → `ImageBuild` CR 생성 → `imagebuild-controller`가 Kaniko Job 기동(Base pull: ImageHub / Image Catalog, Context: AIPub Volume → build → push: ImageHub) → status/logs를 UI로 표시.
+**흐름:** Dockerfile 작성/저장 → `backend-server`가 Dockerfile 저장 → 빌드 Run → **프론트가 k8sproxy로 `ImageBuild` CR을 직접 생성** → `imagebuild-controller`가 Kaniko Job 기동(Base pull: ImageHub / Image Catalog, Context: AIPub Volume → build → push: ImageHub) → 빌드 status는 프론트가 k8sproxy로 CR을 직접 조회, 빌드 logs는 `backend-server`(Pod 로그 + OpenSearch fallback) 경유로 UI에 표시.
 
 ## 10. 구현 결정 사항 (Implementation Decisions)
 

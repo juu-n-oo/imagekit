@@ -303,11 +303,11 @@ flowchart LR
 <tbody>
 <tr>
 <td><strong>imagekit-web</strong></td>
-<td>Dockerfile 에디터, base 이미지 선택, 빌드 트리거, 결과/로그 조회 UI</td>
+<td>Dockerfile 에디터, base 이미지 선택, 빌드 트리거(k8sproxy로 <code>ImageBuild</code> CR 직접 생성/조회/삭제/재빌드), 결과/로그 조회 UI</td>
 </tr>
 <tr>
 <td><strong>backend-server</strong></td>
-<td>Dockerfile CRUD, <code>ImageBuild</code> CR 생성, 상태/로그 조회 (REST API, Swagger)</td>
+<td>Dockerfile CRUD, 빌드 <strong>로그</strong> 조회(Pod 로그 + OpenSearch fallback), Volume·ImageHub 조회 (REST API, Swagger). <strong>ImageBuild CR 생성/조회/삭제는 담당하지 않는다</strong>(프론트가 k8sproxy로 직접 수행)</td>
 </tr>
 <tr>
 <td><strong>imagebuild-controller</strong></td>
@@ -331,7 +331,7 @@ flowchart LR
 </tr>
 </tbody>
 </table></div>
-<p><strong>흐름:</strong> 작성/저장 → <code>backend-server</code> 저장 → 빌드 Run → <code>ImageBuild</code> CR 생성 → <code>imagebuild-controller</code>가 Kaniko Job 기동(Base pull: ImageHub / Image Catalog, Context: AIPub Volume → build → push: ImageHub) → status/logs를 UI로 표시.</p>
+<p><strong>흐름:</strong> Dockerfile 작성/저장 → <code>backend-server</code>가 Dockerfile 저장 → 빌드 Run → <strong>프론트가 k8sproxy로 <code>ImageBuild</code> CR을 직접 생성</strong> → <code>imagebuild-controller</code>가 Kaniko Job 기동(Base pull: ImageHub / Image Catalog, Context: AIPub Volume → build → push: ImageHub) → 빌드 status는 프론트가 k8sproxy로 CR을 직접 조회, 빌드 logs는 <code>backend-server</code>(Pod 로그 + OpenSearch fallback) 경유로 UI에 표시.</p>
 <h2>10. 구현 결정 사항 (Implementation Decisions)</h2>
 <p>설계서에 없던, 구현하며 결정한 사항을 <strong>요약</strong>한다. (세부 기술 배경은 각 항목의 링크·코드 참조) 출시 전 추가 검토가 필요한 항목은 11절 Open Questions로 다룬다.</p>
 <h3>채택 · 구현 완료</h3>

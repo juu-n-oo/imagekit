@@ -16,7 +16,7 @@
 | 디렉토리 | 역할 | 원격 |
 |---|---|---|
 | `imagekit-web` | 프론트엔드 (Dockerfile 에디터, 빌드 트리거, 로그/결과 조회 UI) | `ten1010-io/imagekit-web` |
-| `imagekit-backend` | 백엔드 (Dockerfile 저장, CR 생성, 빌드 상태/로그 제공) | `ten1010-io/imagekit-backend` |
+| `imagekit-backend` | 백엔드 (Dockerfile 저장/버전관리, 빌드 **로그** 제공, Volume·ImageHub 조회) — **ImageBuild CR 은 생성하지 않는다**(프론트가 k8sproxy로 직접) | `ten1010-io/imagekit-backend` |
 | `image-build-controller` | ImageBuild CR watch → Kaniko Job 관리 (k8s 컨트롤러) | `ten1010-io/image-build-controller` |
 
 - 세 서브 repo 는 본 umbrella 의 git 추적 대상이 **아니다** (`.gitignore` 로 제외). 각 repo 안에서 직접 commit / push 한다.
