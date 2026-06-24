@@ -18,6 +18,9 @@ image-build-controller/
 .claude/settings.local.json
 .claude/launch.json
 
+# build-and-push.sh 설정(자격증명 포함) — 예시 파일만 추적한다
+build-and-push.config
+
 # 기타
 *.log
 .env
