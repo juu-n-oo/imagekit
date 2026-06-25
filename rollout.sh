@@ -8,14 +8,17 @@
 #   - 실행하면 이미지 태그를 한 번 입력받는다(기본값 1.0.0).
 #   - imagekit-web / imagekit-backend / image-build-controller 각각에 대해
 #     롤아웃할지 물어보고, 동의한 것만 진행한다.
+#   - k8s 워크로드는 external. 없는 레지스트리를 참조하므로 이미지는
+#       <K8S_REGISTRY>/<HARBOR_PROJECT>/<name>:<tag>  (예: registry.ten1010.io:8443/aipub/imagekit-web:1.0.0)
+#     형식으로 set image 한다(빌드/푸시는 external.registry... 로 했더라도 동일 Harbor).
 #   - 동작(대상별):
-#       · 현재 이미지 != <REGISTRY>/<HARBOR_PROJECT>/<name>:<tag> → kubectl set image (→ 자동 롤아웃)
-#       · 현재 이미지 == 동일(태그 변동 없음)                     → kubectl rollout restart (재pull)
+#       · 현재 이미지 != 위 이미지 → kubectl set image (→ 자동 롤아웃)
+#       · 현재 이미지 == 동일(태그 변동 없음) → kubectl rollout restart (재pull)
 #       · 이후 kubectl rollout status 로 완료를 기다린다.
 #
-# 설정은 build-and-push.sh 와 동일한 build-and-push.config 를 공유한다.
-#   REGISTRY / HARBOR_PROJECT / NAMESPACE / KUBECTL
-#   (cp build-and-push.config.example build-and-push.config 후 값 채우기)
+# 설정은 build-and-push.sh 와 동일한 cicd.config 를 공유한다.
+#   K8S_REGISTRY / HARBOR_PROJECT / NAMESPACE / KUBECTL
+#   (cp cicd.config.example cicd.config 후 값 채우기)
 # 환경변수로 미리 지정한 값이 설정 파일보다 우선한다. 설정 파일 경로는 CONFIG 로 바꿀 수 있다.
 #
 # 사용법:
@@ -29,26 +32,26 @@ cd "$SCRIPT_DIR"
 DEFAULT_TAG="1.0.0"
 
 # ── 설정 파일 로딩 (env > config 파일 > 기본값) ───────────────
-_ENV_REGISTRY="${REGISTRY:-}"; _ENV_PROJECT="${HARBOR_PROJECT:-}"
+_ENV_REGISTRY="${K8S_REGISTRY:-}"; _ENV_PROJECT="${HARBOR_PROJECT:-}"
 _ENV_NS="${NAMESPACE:-}"; _ENV_KUBECTL="${KUBECTL:-}"
 
-CONFIG="${CONFIG:-${SCRIPT_DIR}/build-and-push.config}"
+CONFIG="${CONFIG:-${SCRIPT_DIR}/cicd.config}"
 if [[ -f "$CONFIG" ]]; then
     # shellcheck disable=SC1090
     source "$CONFIG"
     echo "[INFO]  설정 로드: ${CONFIG}"
 else
     echo "[WARN]  설정 파일 없음: ${CONFIG}"
-    echo "        cp build-and-push.config.example build-and-push.config 후 값을 채우세요."
+    echo "        cp cicd.config.example cicd.config 후 값을 채우세요."
     echo "        (계속 진행하려면 env 또는 기본값을 사용합니다)"
 fi
 
-[[ -n "$_ENV_REGISTRY" ]] && REGISTRY="$_ENV_REGISTRY"
+[[ -n "$_ENV_REGISTRY" ]] && K8S_REGISTRY="$_ENV_REGISTRY"
 [[ -n "$_ENV_PROJECT"  ]] && HARBOR_PROJECT="$_ENV_PROJECT"
 [[ -n "$_ENV_NS"       ]] && NAMESPACE="$_ENV_NS"
 [[ -n "$_ENV_KUBECTL"  ]] && KUBECTL="$_ENV_KUBECTL"
 
-REGISTRY="${REGISTRY:-external.registry.ten1010.io}"
+K8S_REGISTRY="${K8S_REGISTRY:-registry.ten1010.io:8443}"
 HARBOR_PROJECT="${HARBOR_PROJECT:-aipub}"
 NAMESPACE="${NAMESPACE:-aipub}"
 KUBECTL="${KUBECTL:-sudo kubectl}"
@@ -87,7 +90,7 @@ declare -a RESULTS=()
 
 rollout_one() {
     local name="$1"
-    local image="${REGISTRY}/${HARBOR_PROJECT}/${name}:${TAG}"
+    local image="${K8S_REGISTRY}/${HARBOR_PROJECT}/${name}:${TAG}"
 
     c_step "${name} → ${image} (ns: ${NAMESPACE})"
 
@@ -135,7 +138,7 @@ rollout_one() {
 }
 
 # ── 메인 루프: deployment 별로 물어보고 진행 ───────────────────
-c_step "롤아웃 대상 선택 (태그: ${TAG}, 이미지: ${REGISTRY}/${HARBOR_PROJECT}/<name>, ns: ${NAMESPACE})"
+c_step "롤아웃 대상 선택 (태그: ${TAG}, 이미지: ${K8S_REGISTRY}/${HARBOR_PROJECT}/<name>, ns: ${NAMESPACE})"
 for name in "${DEPLOYS[@]}"; do
     if ask "[$name] 롤아웃할까요?" n; then
         rollout_one "$name"

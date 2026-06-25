@@ -1,0 +1,36 @@
+# cicd.config — build-and-push.sh / rollout.sh 공용 설정 (예시)
+#
+# 사용법:
+#   cp cicd.config.example cicd.config
+#   # 값(특히 HARBOR_PASSWORD) 채운 뒤 실행
+#   ./build-and-push.sh   # 빌드 & 푸시
+#   ./rollout.sh          # 클러스터 롤아웃
+#
+# 이 파일은 두 스크립트가 그대로 `source` 한다(셸 형식, KEY="value").
+# cicd.config 는 비밀번호를 담으므로 git 추적 대상이 아니다(.gitignore).
+# 환경변수로 미리 지정한 값이 있으면 그 값이 우선한다(설정 파일은 비어있을 때만 채운다).
+
+# ── 레지스트리 / 이미지 경로 ─────────────────────────────────
+# build & push 할 때 쓰는 레지스트리 (external. prefix + :8443 포트).
+#   최종 빌드/푸시 이미지: ${REGISTRY}/${HARBOR_PROJECT}/<name>:<tag>
+REGISTRY="external.registry.ten1010.io:8443"
+# k8s 워크로드(deployment)가 참조하는 레지스트리 (external. 없음, :8443).
+#   rollout.sh 가 set image 에 쓰는 이미지: ${K8S_REGISTRY}/${HARBOR_PROJECT}/<name>:<tag>
+K8S_REGISTRY="registry.ten1010.io:8443"
+HARBOR_PROJECT="aipub"
+
+# ── Harbor 로그인 자격증명 ───────────────────────────────────
+# 둘 다 채우면 스크립트가 자동으로 `docker login` 한다.
+# 비워두면 이미 `docker login ${REGISTRY}` 된 상태(노드에 자격증명 존재)로 가정한다.
+HARBOR_USERNAME="java"
+HARBOR_PASSWORD=""
+
+# ── docker 실행 커맨드 ───────────────────────────────────────
+# 클러스터 노드에서 빌드하므로 보통 "sudo docker".
+DOCKER="sudo docker"
+
+# ── rollout.sh 전용 설정 ─────────────────────────────────────
+# 배포 대상 네임스페이스.
+NAMESPACE="aipub"
+# kubectl 실행 커맨드(노드에서 sudo 필요 시 "sudo kubectl").
+KUBECTL="sudo kubectl"

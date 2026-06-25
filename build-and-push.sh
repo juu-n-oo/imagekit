@@ -2,24 +2,24 @@
 #
 # ImageKit 로컬 빌드 & 푸시 헬퍼
 #
-# 각 repo 의 GitHub Actions CD(.github/workflows/cd.yml)가 하던 일을 로컬에서 그대로 재현한다.
-# (GitHub Actions 결제/한도 문제로 CD 가 막혔을 때의 우회 경로)
+# 각 repo 의 GitHub Actions CD(.github/workflows/cd.yml)가 하던 빌드/푸시를 로컬에서 재현한다.
+# (GitHub Actions 결제/한도 문제로 CD 가 막혔을 때의 우회 경로 / 클러스터 노드에서 직접 빌드)
 #
-#   - 실행하면 이미지 태그를 한 번 입력받는다.
+#   - 실행하면 이미지 태그를 한 번 입력받는다(기본값 1.0.0).
 #   - image-build-controller / imagekit-web / imagekit-backend 각각에 대해
 #     빌드 & 푸시할지 물어보고, 동의한 것만 진행한다.
 #   - 이미지: <REGISTRY>/<HARBOR_PROJECT>/<name>:<tag>
 #       · imagekit-web         : 멀티스테이지(컨테이너 내부 빌드) + VITE_APP_VERSION build-arg
 #       · imagekit-backend     : ./gradlew bootJar -x test -x asciidoctor 후 jar COPY
 #       · image-build-controller: ./gradlew bootJar -x test 후 jar COPY
-#   - (선택) 액션과 동일하게 git 태그(force)도 push 할 수 있다.
+#   - git 태그는 다루지 않는다(필요 시 본인 계정으로 직접 push).
 #
 # 사용법:
 #   ./build-and-push.sh
 #
-# Harbor 정보 등 설정은 설정 파일(build-and-push.config)에서 읽는다.
-#   cp build-and-push.config.example build-and-push.config  후 값 채우기
-# 설정 키: REGISTRY / HARBOR_PROJECT / HARBOR_USERNAME / HARBOR_PASSWORD / PLATFORM / DOCKER
+# Harbor 정보 등 설정은 설정 파일(cicd.config)에서 읽는다.
+#   cp cicd.config.example cicd.config  후 값 채우기
+# 설정 키: REGISTRY / HARBOR_PROJECT / HARBOR_USERNAME / HARBOR_PASSWORD / DOCKER
 # 환경변수로 미리 지정한 값이 설정 파일보다 우선한다. 설정 파일 경로는 CONFIG 로 바꿀 수 있다.
 #
 set -uo pipefail
@@ -27,20 +27,22 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+DEFAULT_TAG="1.0.0"
+
 # ── 설정 파일 로딩 (env > config 파일 > 기본값) ───────────────
 # 미리 설정된 env 값을 보존했다가 config 로 채운 뒤 되살린다(= env 우선).
 _ENV_REGISTRY="${REGISTRY:-}"; _ENV_PROJECT="${HARBOR_PROJECT:-}"
 _ENV_USER="${HARBOR_USERNAME:-}"; _ENV_PASS="${HARBOR_PASSWORD:-}"
-_ENV_PLATFORM="${PLATFORM:-}"; _ENV_DOCKER="${DOCKER:-}"
+_ENV_DOCKER="${DOCKER:-}"
 
-CONFIG="${CONFIG:-${SCRIPT_DIR}/build-and-push.config}"
+CONFIG="${CONFIG:-${SCRIPT_DIR}/cicd.config}"
 if [[ -f "$CONFIG" ]]; then
     # shellcheck disable=SC1090
     source "$CONFIG"
     echo "[INFO]  설정 로드: ${CONFIG}"
 else
     echo "[WARN]  설정 파일 없음: ${CONFIG}"
-    echo "        cp build-and-push.config.example build-and-push.config 후 값을 채우세요."
+    echo "        cp cicd.config.example cicd.config 후 값을 채우세요."
     echo "        (계속 진행하려면 env 또는 기본값을 사용합니다)"
 fi
 
@@ -49,15 +51,13 @@ fi
 [[ -n "$_ENV_PROJECT"  ]] && HARBOR_PROJECT="$_ENV_PROJECT"
 [[ -n "$_ENV_USER"     ]] && HARBOR_USERNAME="$_ENV_USER"
 [[ -n "$_ENV_PASS"     ]] && HARBOR_PASSWORD="$_ENV_PASS"
-[[ -n "$_ENV_PLATFORM" ]] && PLATFORM="$_ENV_PLATFORM"
 [[ -n "$_ENV_DOCKER"   ]] && DOCKER="$_ENV_DOCKER"
 
 # 최종 기본값 보정.
-REGISTRY="${REGISTRY:-external.registry.ten1010.io}"
+REGISTRY="${REGISTRY:-external.registry.ten1010.io:8443}"
 HARBOR_PROJECT="${HARBOR_PROJECT:-aipub}"
-PLATFORM="${PLATFORM:-linux/amd64}"
-DOCKER="${DOCKER:-docker}"
-HARBOR_USERNAME="${HARBOR_USERNAME:-}"
+DOCKER="${DOCKER:-sudo docker}"
+HARBOR_USERNAME="${HARBOR_USERNAME:-java}"
 HARBOR_PASSWORD="${HARBOR_PASSWORD:-}"
 
 # ── 색상 로그 ────────────────────────────────────────────────
@@ -82,18 +82,10 @@ ask() {
     done
 }
 
-# ── 태그 입력 ────────────────────────────────────────────────
-TAG=""
-while [[ -z "$TAG" ]]; do
-    read -r -p "이미지 태그를 입력하세요 (예: 0.1.0): " TAG < /dev/tty || TAG=""
-    TAG="$(printf '%s' "$TAG" | tr -d '[:space:]')"
-    [[ -z "$TAG" ]] && echo "태그는 비울 수 없습니다."
-done
-
-PUSH_GIT_TAG=false
-if ask "각 repo 에 git 태그 '${TAG}' 도 force-push 할까요? (액션 동작과 동일)" n; then
-    PUSH_GIT_TAG=true
-fi
+# ── 태그 입력 (기본값 1.0.0) ──────────────────────────────────
+read -r -p "이미지 태그를 입력하세요 [${DEFAULT_TAG}]: " TAG < /dev/tty || TAG=""
+TAG="$(printf '%s' "$TAG" | tr -d '[:space:]')"
+TAG="${TAG:-$DEFAULT_TAG}"
 
 # ── Harbor 로그인(자격증명이 주어진 경우에만) ───────────────────
 if [[ -n "${HARBOR_USERNAME:-}" && -n "${HARBOR_PASSWORD:-}" ]]; then
@@ -105,7 +97,7 @@ if [[ -n "${HARBOR_USERNAME:-}" && -n "${HARBOR_PASSWORD:-}" ]]; then
         exit 1
     fi
 else
-    c_warn "HARBOR_USERNAME/HARBOR_PASSWORD 미설정 — 이미 'docker login ${REGISTRY}' 된 상태로 가정합니다."
+    c_warn "HARBOR_PASSWORD 미설정 — 이미 'docker login ${REGISTRY}' 된 상태(노드 자격증명)로 가정합니다."
 fi
 
 # ── repo 정의: "name|dir|prebuild|build_args" ──────────────────
@@ -142,10 +134,10 @@ build_and_push() {
         fi
     fi
 
-    # 2) docker build
-    c_info "docker build (platform=${PLATFORM})"
+    # 2) docker build (클러스터 노드 = amd64 네이티브, --platform 불필요)
+    c_info "docker build"
     # shellcheck disable=SC2086
-    $DOCKER build --platform "$PLATFORM" $build_args \
+    $DOCKER build $build_args \
         -t "$image" \
         -f "${dir}/Dockerfile" \
         "$dir"
@@ -163,20 +155,7 @@ build_and_push() {
         return 1
     fi
     c_ok "${name}: 이미지 푸시 완료 → ${image}"
-
-    # 4) (선택) git 태그 force-push — 액션의 'Create & push git tag' 단계
-    if [[ "$PUSH_GIT_TAG" == true ]]; then
-        c_info "git 태그 push: ${name} @ ${TAG}"
-        if ( cd "$dir" && git tag -f "$TAG" && git push origin "$TAG" --force ); then
-            c_ok "${name}: git 태그 '${TAG}' push 완료"
-            RESULTS+=("${name}: OK (image + git tag)")
-        else
-            c_warn "${name}: 이미지는 푸시됐으나 git 태그 push 실패"
-            RESULTS+=("${name}: OK image / git tag FAILED")
-        fi
-    else
-        RESULTS+=("${name}: OK (image)")
-    fi
+    RESULTS+=("${name}: OK (${TAG})")
     return 0
 }
 
