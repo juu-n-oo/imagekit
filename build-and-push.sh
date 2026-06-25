@@ -31,7 +31,8 @@ DEFAULT_TAG="1.0.0"
 
 # ── 설정 파일 로딩 (env > config 파일 > 기본값) ───────────────
 # 미리 설정된 env 값을 보존했다가 config 로 채운 뒤 되살린다(= env 우선).
-_ENV_REGISTRY="${REGISTRY:-}"; _ENV_PROJECT="${HARBOR_PROJECT:-}"
+_ENV_REGISTRY="${REGISTRY:-}"; _ENV_K8S_REGISTRY="${K8S_REGISTRY:-}"
+_ENV_PROJECT="${HARBOR_PROJECT:-}"
 _ENV_USER="${HARBOR_USERNAME:-}"; _ENV_PASS="${HARBOR_PASSWORD:-}"
 _ENV_DOCKER="${DOCKER:-}"
 
@@ -47,7 +48,8 @@ else
 fi
 
 # env 가 지정돼 있으면 config 값을 덮어쓴다(env 우선).
-[[ -n "$_ENV_REGISTRY" ]] && REGISTRY="$_ENV_REGISTRY"
+[[ -n "$_ENV_REGISTRY"     ]] && REGISTRY="$_ENV_REGISTRY"
+[[ -n "$_ENV_K8S_REGISTRY" ]] && K8S_REGISTRY="$_ENV_K8S_REGISTRY"
 [[ -n "$_ENV_PROJECT"  ]] && HARBOR_PROJECT="$_ENV_PROJECT"
 [[ -n "$_ENV_USER"     ]] && HARBOR_USERNAME="$_ENV_USER"
 [[ -n "$_ENV_PASS"     ]] && HARBOR_PASSWORD="$_ENV_PASS"
@@ -55,6 +57,7 @@ fi
 
 # 최종 기본값 보정.
 REGISTRY="${REGISTRY:-external.registry.ten1010.io:8443}"
+K8S_REGISTRY="${K8S_REGISTRY:-registry.ten1010.io:8443}"
 HARBOR_PROJECT="${HARBOR_PROJECT:-aipub}"
 DOCKER="${DOCKER:-sudo docker}"
 HARBOR_USERNAME="${HARBOR_USERNAME:-java}"
@@ -87,17 +90,28 @@ read -r -p "이미지 태그를 입력하세요 [${DEFAULT_TAG}]: " TAG < /dev/t
 TAG="$(printf '%s' "$TAG" | tr -d '[:space:]')"
 TAG="${TAG:-$DEFAULT_TAG}"
 
+# ── 빌드 위치에 따른 레지스트리 선택 ───────────────────────────
+# 클러스터(노드) 내부: external. 없는 K8S_REGISTRY 사용
+# 외부(맥 등):        external. 붙은 REGISTRY 사용
+if ask "클러스터(노드) 내부에서 빌드/푸시합니까? (registry.ten1010.io:8443 사용)" y; then
+    BUILD_REGISTRY="$K8S_REGISTRY"
+    c_info "클러스터 내부 레지스트리 사용: ${BUILD_REGISTRY}"
+else
+    BUILD_REGISTRY="$REGISTRY"
+    c_info "외부 레지스트리 사용: ${BUILD_REGISTRY}"
+fi
+
 # ── Harbor 로그인(자격증명이 주어진 경우에만) ───────────────────
 if [[ -n "${HARBOR_USERNAME:-}" && -n "${HARBOR_PASSWORD:-}" ]]; then
-    c_step "Harbor 로그인: ${REGISTRY}"
-    if printf '%s' "$HARBOR_PASSWORD" | $DOCKER login "$REGISTRY" -u "$HARBOR_USERNAME" --password-stdin; then
+    c_step "Harbor 로그인: ${BUILD_REGISTRY}"
+    if printf '%s' "$HARBOR_PASSWORD" | $DOCKER login "$BUILD_REGISTRY" -u "$HARBOR_USERNAME" --password-stdin; then
         c_ok "로그인 성공"
     else
         c_err "Harbor 로그인 실패 — 자격증명을 확인하세요."
         exit 1
     fi
 else
-    c_warn "HARBOR_PASSWORD 미설정 — 이미 'docker login ${REGISTRY}' 된 상태(노드 자격증명)로 가정합니다."
+    c_warn "HARBOR_PASSWORD 미설정 — 이미 'docker login ${BUILD_REGISTRY}' 된 상태(노드 자격증명)로 가정합니다."
 fi
 
 # ── repo 정의: "name|dir|prebuild|build_args" ──────────────────
@@ -111,9 +125,50 @@ REPOS=(
 
 declare -a RESULTS=()
 
+# Dockerfile 의 FROM 을 파싱해 외부 base 이미지를 로컬에 보장한다.
+# (클러스터-도커허브 네트워크가 끊겨도 로컬 캐시로 빌드되도록, 없을 때만 미리 pull)
+# - 멀티스테이지의 스테이지 alias(FROM ... AS x)는 외부 이미지가 아니므로 제외
+# - 변수 참조($) FROM 은 자동 pull 대상에서 제외(경고만)
+ensure_base_images() {
+    local dockerfile="$1"
+    [[ -f "$dockerfile" ]] || return 0
+
+    # FROM 라인 → 'FROM'/'--platform=' 제거
+    local froms
+    froms=$(grep -iE '^[[:space:]]*FROM[[:space:]]' "$dockerfile" \
+        | sed -E 's/^[[:space:]]*[Ff][Rr][Oo][Mm][[:space:]]+//; s/^--platform=[^[:space:]]+[[:space:]]+//')
+
+    # 스테이지 alias 수집 (FROM <img> AS <alias>)
+    local aliases
+    aliases=$(printf '%s\n' "$froms" | awk 'tolower($2)=="as"{print $3}')
+
+    local img
+    while read -r img; do
+        [[ -z "$img" ]] && continue
+        if [[ "$img" == *'$'* ]]; then
+            c_warn "base 이미지 '${img}' 는 변수 참조 — 자동 pull 생략"
+            continue
+        fi
+        # 스테이지 alias 면 외부 이미지가 아님 → 건너뜀
+        if printf '%s\n' "$aliases" | grep -qxF "$img"; then
+            continue
+        fi
+        if $DOCKER image inspect "$img" >/dev/null 2>&1; then
+            c_info "base 이미지 로컬 존재: ${img}"
+        else
+            c_info "base 이미지 없음 → pull: ${img}"
+            if ! $DOCKER pull "$img"; then
+                c_err "base 이미지 pull 실패: ${img}"
+                return 1
+            fi
+        fi
+    done < <(printf '%s\n' "$froms" | awk '{print $1}')
+    return 0
+}
+
 build_and_push() {
     local name="$1" dir="$2" prebuild="$3" build_args="$4"
-    local image="${REGISTRY}/${HARBOR_PROJECT}/${name}:${TAG}"
+    local image="${BUILD_REGISTRY}/${HARBOR_PROJECT}/${name}:${TAG}"
 
     if [[ ! -d "$dir" ]]; then
         c_err "${name}: 디렉터리 '${dir}' 없음 — 건너뜀"
@@ -134,7 +189,15 @@ build_and_push() {
         fi
     fi
 
-    # 2) docker build (클러스터 노드 = amd64 네이티브, --platform 불필요)
+    # 2) base 이미지 보장 (네트워크 끊겨도 로컬 캐시로 빌드되도록 미리 확인/pull)
+    c_info "base 이미지 확인"
+    if ! ensure_base_images "${dir}/Dockerfile"; then
+        c_err "${name}: base 이미지 준비 실패"
+        RESULTS+=("${name}: FAILED (base pull)")
+        return 1
+    fi
+
+    # 3) docker build (클러스터 노드 = amd64 네이티브, --platform 불필요)
     c_info "docker build"
     # shellcheck disable=SC2086
     $DOCKER build $build_args \
@@ -147,7 +210,7 @@ build_and_push() {
         return 1
     fi
 
-    # 3) docker push
+    # 4) docker push
     c_info "docker push ${image}"
     if ! $DOCKER push "$image"; then
         c_err "${name}: docker push 실패"
@@ -160,7 +223,7 @@ build_and_push() {
 }
 
 # ── 메인 루프: repo 별로 물어보고 진행 ─────────────────────────
-c_step "배포 대상 선택 (태그: ${TAG}, 레지스트리: ${REGISTRY}/${HARBOR_PROJECT})"
+c_step "배포 대상 선택 (태그: ${TAG}, 레지스트리: ${BUILD_REGISTRY}/${HARBOR_PROJECT})"
 for entry in "${REPOS[@]}"; do
     IFS='|' read -r name dir prebuild build_args <<< "$entry"
     if ask "[$name] 빌드 & 푸시할까요?" n; then

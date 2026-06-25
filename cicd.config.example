@@ -15,7 +15,8 @@
 #   최종 빌드/푸시 이미지: ${REGISTRY}/${HARBOR_PROJECT}/<name>:<tag>
 REGISTRY="external.registry.ten1010.io:8443"
 # k8s 워크로드(deployment)가 참조하는 레지스트리 (external. 없음, :8443).
-#   rollout.sh 가 set image 에 쓰는 이미지: ${K8S_REGISTRY}/${HARBOR_PROJECT}/<name>:<tag>
+#   - rollout.sh 가 set image 에 쓰는 이미지: ${K8S_REGISTRY}/${HARBOR_PROJECT}/<name>:<tag>
+#   - build-and-push.sh 에서 "클러스터 내부에서 빌드" 를 선택하면 이 주소로 빌드/푸시한다.
 K8S_REGISTRY="registry.ten1010.io:8443"
 HARBOR_PROJECT="aipub"
 
